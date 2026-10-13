@@ -633,7 +633,8 @@ class SortedEnumMeta(EnumMeta):
         # Sort the members by their values
         # pylint: disable=unsubscriptable-object
         cls._member_names_ = sorted(
-            cls._member_names_, key=lambda name: cls[name].value  # type: ignore
+            cls._member_names_,
+            key=lambda name: cls[name].value,  # type: ignore
         )
 
 

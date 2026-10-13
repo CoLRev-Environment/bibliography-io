@@ -63,7 +63,6 @@ def run_fix_bib_file(filename: Path, *, logger: logging.Logger) -> None:
         return temp_id
 
     if filename is not None:
-
         with open(filename, encoding="utf8") as bibtex_file:
             contents = bibtex_file.read()
             if len(contents) < 10:

@@ -21,7 +21,6 @@ def test_load_nbib_entries(tmp_path, helpers):  # type: ignore
             record_dict[Fields.ENTRYTYPE] = ENTRYTYPES.MISC
 
     def field_mapper(record_dict: dict) -> None:
-
         key_maps = {
             ENTRYTYPES.ARTICLE: {
                 "TI": Fields.TITLE,

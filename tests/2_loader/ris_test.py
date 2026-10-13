@@ -118,7 +118,7 @@ def test_unknown_source_reuses_default_ris_mapping(tmp_path: Path) -> None:
     """Keep unknown-source RIS loading compatible with the shared defaults."""
     ris_file = tmp_path / "unknown.ris"
     ris_file.write_text(
-        "TY  - JOUR\nTI  - Shared mapping\nPY  - 2022/01/01\n" "PMID  - 12345\nER  -\n",
+        "TY  - JOUR\nTI  - Shared mapping\nPY  - 2022/01/01\nPMID  - 12345\nER  -\n",
         encoding="utf-8",
     )
 

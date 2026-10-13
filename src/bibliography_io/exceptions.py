@@ -148,9 +148,7 @@ class InvalidSettingsError(CoLRevException):
         """Initialize the instance."""
         msg = f"Error in SETTINGS_FILE: {msg}"
         if fix_per_upgrade:
-            msg += (
-                "\nTo solve this, use\n  " f"{Colors.ORANGE}colrev upgrade{Colors.END}"
-            )
+            msg += f"\nTo solve this, use\n  {Colors.ORANGE}colrev upgrade{Colors.END}"
         self.message = msg
         super().__init__(self.message)
 

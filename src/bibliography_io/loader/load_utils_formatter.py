@@ -119,7 +119,6 @@ class LoadFormatter:
     def _apply_strict_requirements(
         self, *, record: colrev.record.record.Record
     ) -> None:
-
         self._fix_author_particles(record)
         self._format_doi(record)
         self._unify_language(record)

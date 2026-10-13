@@ -52,7 +52,6 @@ def test_load(tmp_path, helpers) -> None:  # type: ignore
                 record_dict[Fields.ENTRYTYPE] = ENTRYTYPES.MISC
 
     def field_mapper(record_dict: dict) -> None:
-
         key_maps = {
             ENTRYTYPES.ARTICLE: {
                 "T": Fields.TITLE,
