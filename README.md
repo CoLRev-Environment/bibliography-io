@@ -66,3 +66,7 @@ pytest tests/test_public_api.py
 ```
 
 See [RELEASING.md](RELEASING.md) for the package build and publication process.
+
+## License
+
+This project is distributed under the [MIT License](LICENSE).
