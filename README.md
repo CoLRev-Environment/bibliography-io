@@ -6,12 +6,10 @@ BibTeX, RIS, CSV, Excel, Markdown, ENL, NBIB, and JSON.
 ## Explicit function imports
 
 ```python
-from pathlib import Path
-
 from bibliography_io import load_records, write_records
 
-records = load_records(filename=Path("references.bib"))
-write_records(records, filename=Path("references.ris"))
+records = load_records(filename="references.bib")
+write_records(records, filename="references.ris")
 ```
 
 `load_records` accepts the same options as the loader's `load()` function;
@@ -25,8 +23,8 @@ same functions:
 ```python
 import bibliography_io as bibio
 
-records = bibio.load(filename=Path("references.bib"))
-bibio.write(records, filename=Path("references.ris"))
+records = bibio.load(filename="references.bib")
+bibio.write(records, filename="references.ris")
 ```
 
 Both patterns share the same implementations and preserve the loader and writer
