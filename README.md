@@ -1,4 +1,13 @@
+<div align="center">
+
 # bibliography-io
+
+[![PyPI - Version](https://img.shields.io/pypi/v/bibliography-io?color=blue)](https://pypi.org/project/bibliography-io/)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/bibliography-io)
+[![License](https://img.shields.io/github/license/CoLRev-Environment/bibliography-io)](https://github.com/CoLRev-Environment/bibliography-io/blob/main/LICENSE)
+[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/CoLRev-Environment/bibliography-io/ci.yml?label=tests)](https://github.com/CoLRev-Environment/bibliography-io/actions/workflows/ci.yml)
+
+</div>
 
 `bibliography-io` loads and writes bibliographic records in formats including
 BibTeX, RIS, CSV, Excel, Markdown, ENL, NBIB, and JSON.
