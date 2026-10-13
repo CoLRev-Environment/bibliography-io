@@ -9,9 +9,7 @@ description = "Loading and writing bibliographic records across formats"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-authors = [
-    { name = "Gerit Wagner" },
-]
+authors = [{ name = "Gerit Wagner" }]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -25,21 +23,20 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: Text Processing",
 ]
-dependencies = [
-    "pandas>=2.2,<3",
-    "openpyxl>=3.1.2",
-]
+dependencies = ["pandas>=2.2,<3", "openpyxl>=3.1.2"]
 
 [project.urls]
 Homepage = "https://github.com/CoLRev-Environment/bibliography-io"
 Repository = "https://github.com/CoLRev-Environment/bibliography-io"
 Issues = "https://github.com/CoLRev-Environment/bibliography-io/issues"
 Changelog = "https://github.com/CoLRev-Environment/bibliography-io/releases"
+Documentation = "https://colrev-environment.github.io/bibliography-io/"
 
 [project.optional-dependencies]
 colrev = ["colrev"]
 requests = ["requests>=2.31"]
 all = ["colrev", "requests>=2.31"]
+docs = ["sphinx>=7.3,<9", "sphinx-rtd-theme>=3.0", "sphinx-copybutton>=0.5.2"]
 
 [dependency-groups]
 dev = [
@@ -49,10 +46,7 @@ dev = [
     "pytest-mock>=3.14",
     "twine>=5.0",
 ]
-test = [
-    "colrev",
-    "requests>=2.31",
-]
+test = ["colrev", "requests>=2.31"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bibliography_io"]
