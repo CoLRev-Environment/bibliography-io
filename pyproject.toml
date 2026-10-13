@@ -6,16 +6,52 @@ build-backend = "hatchling.build"
 name = "bibliography-io"
 version = "0.1.0"
 description = "Loading and writing bibliographic records across formats"
+readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
+authors = [
+    { name = "Gerit Wagner" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Text Processing",
+]
 dependencies = [
     "pandas>=2.2,<3",
     "openpyxl>=3.1.2",
 ]
 
+[project.urls]
+Homepage = "https://github.com/CoLRev-Environment/bibliography-io"
+Repository = "https://github.com/CoLRev-Environment/bibliography-io"
+Issues = "https://github.com/CoLRev-Environment/bibliography-io/issues"
+Changelog = "https://github.com/CoLRev-Environment/bibliography-io/releases"
+
+[project.optional-dependencies]
+colrev = ["colrev"]
+requests = ["requests>=2.31"]
+all = ["colrev", "requests>=2.31"]
+
 [dependency-groups]
 dev = [
+    "build>=1.2",
+    "pre-commit>=4.0",
     "pytest>=8.0",
+    "pytest-mock>=3.14",
+    "twine>=5.0",
+]
+test = [
+    "colrev",
+    "requests>=2.31",
 ]
 
 [tool.hatch.build.targets.wheel]

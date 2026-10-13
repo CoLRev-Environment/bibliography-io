@@ -137,13 +137,12 @@ from pathlib import Path
 
 import pandas as pd
 
-import colrev.loader.bib
-import colrev.loader.enl
-import colrev.loader.json
-import colrev.loader.md
-import colrev.loader.nbib
-import colrev.loader.ris
-import colrev.loader.table
+from . import bib as bib_loader
+from . import enl as enl_loader
+from . import json as json_loader
+from . import nbib as nbib_loader
+from . import ris as ris_loader
+from . import table as table_loader
 from colrev.constants import ENTRYTYPES
 from colrev.constants import Fields
 
@@ -192,25 +191,27 @@ def load(  # type: ignore
         raise FileNotFoundError
 
     if filename.suffix == ".bib":
-        parser = colrev.loader.bib.BIBLoader  # type: ignore
+        parser = bib_loader.BIBLoader
         if entrytype_setter is None:
             entrytype_setter = bib_entrytype_setter
     elif filename.suffix in [".csv", ".xls", ".xlsx"]:
-        parser = colrev.loader.table.TableLoader  # type: ignore
+        parser = table_loader.TableLoader
     elif filename.suffix == ".ris":
-        parser = colrev.loader.ris.RISLoader  # type: ignore
+        parser = ris_loader.RISLoader
         if entrytype_setter is None:
-            entrytype_setter = colrev.loader.ris.set_entrytype
+            entrytype_setter = ris_loader.set_entrytype
         if field_mapper is None:
-            field_mapper = colrev.loader.ris.map_fields
+            field_mapper = ris_loader.map_fields
     elif filename.suffix in [".enl", ".txt"]:
-        parser = colrev.loader.enl.ENLLoader  # type: ignore
+        parser = enl_loader.ENLLoader
     elif filename.suffix == ".md":
-        parser = colrev.loader.md.MarkdownLoader  # type: ignore
+        from . import md as md_loader
+
+        parser = md_loader.MarkdownLoader
     elif filename.suffix == ".nbib":
-        parser = colrev.loader.nbib.NBIBLoader  # type: ignore
+        parser = nbib_loader.NBIBLoader
     elif filename.suffix == ".json":
-        parser = colrev.loader.json.JSONLoader  # type: ignore
+        parser = json_loader.JSONLoader
     else:
         raise NotImplementedError(f"Unsupported file type: {filename.suffix}")
 
@@ -289,19 +290,21 @@ def get_nr_records(  # type: ignore
         return 0
 
     if filename.suffix == ".bib":
-        parser = colrev.loader.bib.BIBLoader  # type: ignore
+        parser = bib_loader.BIBLoader
     elif filename.suffix in [".csv", ".xls", ".xlsx"]:
-        parser = colrev.loader.table.TableLoader  # type: ignore
+        parser = table_loader.TableLoader
     elif filename.suffix == ".ris":
-        parser = colrev.loader.ris.RISLoader  # type: ignore
+        parser = ris_loader.RISLoader
     elif filename.suffix in [".enl", ".txt"]:
-        parser = colrev.loader.enl.ENLLoader  # type: ignore
+        parser = enl_loader.ENLLoader
     elif filename.suffix == ".md":
-        parser = colrev.loader.md.MarkdownLoader  # type: ignore
+        from . import md as md_loader
+
+        parser = md_loader.MarkdownLoader
     elif filename.suffix == ".nbib":
-        parser = colrev.loader.nbib.NBIBLoader  # type: ignore
+        parser = nbib_loader.NBIBLoader
     elif filename.suffix == ".json":
-        parser = colrev.loader.json.JSONLoader  # type: ignore
+        parser = json_loader.JSONLoader
     else:
         raise NotImplementedError(f"Unsupported file type: {filename.suffix}")
 

@@ -3,6 +3,21 @@
 `bibliography-io` loads and writes bibliographic records in formats including
 BibTeX, RIS, CSV, Excel, Markdown, ENL, NBIB, and JSON.
 
+## Installation
+
+Install the base package with:
+
+```shell
+pip install bibliography-io
+```
+
+The load and write functions use CoLRev's shared metadata definitions. Install
+the `colrev` extra to use them:
+
+```shell
+pip install "bibliography-io[colrev]"
+```
+
 ## Explicit function imports
 
 ```python
@@ -29,3 +44,18 @@ bibio.write(records, filename="references.ris")
 
 Both patterns share the same implementations and preserve the loader and writer
 options, return values, and supported formats.
+
+## Development
+
+Install the project with its optional runtime dependencies and development
+tools, then run the hooks and test suite:
+
+```shell
+pip install -e ".[all]"
+pip install build pre-commit pytest pytest-mock twine
+pre-commit install
+pre-commit run --all-files
+pytest tests/test_public_api.py
+```
+
+See [RELEASING.md](RELEASING.md) for the package build and publication process.

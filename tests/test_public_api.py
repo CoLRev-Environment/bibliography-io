@@ -1,6 +1,8 @@
 """Tests for the package's public API."""
 
 import logging
+import subprocess
+import sys
 from pathlib import Path
 
 import bibliography_io as bibio
@@ -15,6 +17,28 @@ def test_public_api_aliases() -> None:
     assert bibio.load is load_records
     assert bibio.write is write_records
     assert bibio.write_file is write_records
+
+
+def test_package_import_does_not_require_optional_dependencies() -> None:
+    """Import remains available without ColRev and explains the required extra."""
+    source_path = Path(__file__).parents[1] / "src"
+    script = """
+import sys
+sys.path.insert(0, sys.argv[1])
+import bibliography_io
+try:
+    bibliography_io.load_records("references.bib")
+except ImportError as error:
+    assert "bibliography-io[colrev]" in str(error)
+else:
+    raise AssertionError("load_records should require the colrev extra")
+"""
+    subprocess.run(
+        [sys.executable, "-S", "-c", script, str(source_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_both_api_patterns_are_equivalent(tmp_path: Path) -> None:

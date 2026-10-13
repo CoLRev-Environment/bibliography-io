@@ -18,11 +18,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import colrev.writer.bib
-import colrev.writer.csv
-import colrev.writer.excel
-import colrev.writer.markdown
-import colrev.writer.ris
+from . import bib as bib_writer
+from . import csv as csv_writer
+from . import excel as excel_writer
+from . import markdown as markdown_writer
+from . import ris as ris_writer
 
 
 def write_file(records_dict: dict, *, filename: Path, **kw) -> dict:  # type: ignore
@@ -37,15 +37,15 @@ def write_file(records_dict: dict, *, filename: Path, **kw) -> dict:  # type: ig
     if isinstance(filename, str):
         filename = Path(filename)
     if filename.suffix == ".bib":
-        writer = colrev.writer.bib.write_file  # type: ignore
+        writer = bib_writer.write_file
     elif filename.suffix == ".ris":
-        writer = colrev.writer.ris.write_file  # type: ignore
+        writer = ris_writer.write_file
     elif filename.suffix == ".csv":
-        writer = colrev.writer.csv.write_file  # type: ignore
+        writer = csv_writer.write_file
     elif filename.suffix == ".xlsx":
-        writer = colrev.writer.excel.write_file  # type: ignore
+        writer = excel_writer.write_file
     elif filename.suffix == ".md":
-        writer = colrev.writer.markdown.write_file  # type: ignore
+        writer = markdown_writer.write_file
     else:
         raise NotImplementedError(f"Unsupported file type: {filename.suffix}")
 
@@ -58,9 +58,9 @@ def write_file(records_dict: dict, *, filename: Path, **kw) -> dict:  # type: ig
 def to_string(*, records_dict: dict, implementation: str, **kw) -> str:  # type: ignore
     """Write a string (BiBTex, RIS, or other) from a dictionary of records."""
     if implementation == "bib":
-        writer = colrev.writer.bib.to_string  # type: ignore
+        writer = bib_writer.to_string
     elif implementation == "ris":
-        writer = colrev.writer.ris.to_string  # type: ignore
+        writer = ris_writer.to_string
     else:
         raise NotImplementedError
 
