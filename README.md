@@ -18,7 +18,7 @@ the `colrev` extra to use them:
 pip install "bibliography-io[colrev]"
 ```
 
-## Explicit function imports
+## Usage
 
 ```python
 from bibliography_io import load_records, write_records
@@ -29,8 +29,6 @@ write_records(records, filename="references.ris")
 
 `load_records` accepts the same options as the loader's `load()` function;
 `write_records` accepts the same options as the writer's `write_file()` function.
-
-## Namespace imports
 
 For a shorter namespace-style interface, `load` and `write` are aliases of the
 same functions:
