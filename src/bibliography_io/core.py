@@ -1,0 +1,259 @@
+"""Standalone parsing and serialization used by the strict public API."""
+
+from __future__ import annotations
+
+import csv
+import json
+import re
+from collections import OrderedDict
+from io import StringIO
+from pathlib import Path
+from typing import Any
+
+from .exceptions import DuplicateRecordIDError
+from .exceptions import OptionalBackendUnavailableError
+from .exceptions import ParseError
+from .exceptions import RecordValidationError
+from .exceptions import SerializationError
+from .exceptions import UnsupportedFormatError
+
+READ_FORMATS = {"bib", "ris", "csv", "xls", "xlsx", "enl", "txt", "nbib", "json", "md"}
+WRITE_FORMATS = {"bib", "ris", "csv", "xlsx", "md"}
+ALIASES = {"bibtex": "bib", "markdown": "md", "excel": "xlsx", "endnote": "enl"}
+
+
+def normalize_format(value: str) -> str:
+    name = value.lower().lstrip(".")
+    name = ALIASES.get(name, name)
+    if name not in READ_FORMATS:
+        raise UnsupportedFormatError(f"Unsupported bibliography format: {value}")
+    return name
+
+
+def normalize_records(records: Any) -> OrderedDict[str, dict[str, Any]]:
+    if not hasattr(records, "items"):
+        raise RecordValidationError("records must be a mapping of IDs to records")
+    output: OrderedDict[str, dict[str, Any]] = OrderedDict()
+    used: set[str] = set()
+    for mapping_id, raw in records.items():
+        if not isinstance(raw, dict):
+            raise RecordValidationError(f"record {mapping_id!r} must be a mapping")
+        record = dict(raw)
+        record_id = record.get("ID", mapping_id)
+        if record_id is None or str(record_id).strip() == "":
+            candidate = 1
+            while str(candidate) in used:
+                candidate += 1
+            record_id = str(candidate)
+        record_id = str(record_id)
+        if record_id in used:
+            raise DuplicateRecordIDError(f"Duplicate record ID: {record_id}")
+        record["ID"] = record_id
+        entrytype = record.get("ENTRYTYPE", "misc")
+        if not isinstance(entrytype, str) or not entrytype.strip():
+            raise RecordValidationError(f"record {record_id!r} has an invalid ENTRYTYPE")
+        record["ENTRYTYPE"] = entrytype.lower()
+        used.add(record_id)
+        output[record_id] = record
+    return output
+
+
+def _records_from_list(items: Any) -> OrderedDict[str, dict[str, Any]]:
+    if not isinstance(items, list):
+        raise ParseError("Expected a list of record objects")
+    output: OrderedDict[str, dict[str, Any]] = OrderedDict()
+    pending = []
+    source_ids = {str(item["ID"]) for item in items if isinstance(item, dict) and item.get("ID") not in (None, "")}
+    used: set[str] = set()
+    for item in items:
+        if not isinstance(item, dict):
+            raise ParseError("Each record must be a JSON object")
+        record = dict(item)
+        record_id = record.get("ID")
+        if not record_id:
+            n = 1
+            while str(n) in source_ids or str(n) in used:
+                n += 1
+            record_id = str(n)
+        record["ID"] = str(record_id)
+        if record["ID"] in used:
+            raise DuplicateRecordIDError(f"Duplicate record ID: {record['ID']}")
+        used.add(record["ID"])
+        pending.append(record)
+    return normalize_records(OrderedDict((x["ID"], x) for x in pending))
+
+
+def _bib_records(text: str) -> OrderedDict[str, dict[str, Any]]:
+    parsed = []
+    for entry in re.finditer(r"@([\w-]+)\s*[{(]\s*([^,\s]+)\s*,", text):
+        start = entry.end()
+        depth, brace, quoted, escaped, end = 1, 0, False, False, start
+        opening = text[entry.start():entry.end()].rstrip()[-1]
+        closing = "}" if opening == "{" else ")"
+        while end < len(text):
+            char = text[end]
+            if char == '"' and not escaped and brace == 0:
+                quoted = not quoted
+            elif not quoted:
+                if char == "{":
+                    brace += 1
+                elif char == "}" and brace:
+                    brace -= 1
+                elif brace == 0 and char == closing:
+                    depth -= 1
+                    if depth == 0:
+                        break
+                elif brace == 0 and char == "(":
+                    depth += 1
+                elif brace == 0 and char == ")" and closing == ")":
+                    depth -= 1
+                    if depth == 0:
+                        break
+            escaped = char == "\\" and not escaped
+            if char != "\\":
+                escaped = False
+            end += 1
+        body = text[start:end]
+        record: dict[str, Any] = {"ID": entry.group(2), "ENTRYTYPE": entry.group(1).lower()}
+        for field in re.finditer(r"([\w-]+)\s*=\s*(\{(?:[^{}]|\{[^{}]*\})*\}|\"(?:[^\"]|\\.)*\"|[^,\s]+)\s*,?", body, re.S):
+            value = field.group(2).strip()
+            if value.startswith("{") and value.endswith("}") or value.startswith('"') and value.endswith('"'):
+                value = value[1:-1]
+            record[field.group(1).lower()] = value.strip()
+        parsed.append(record)
+    if text.strip() and not parsed:
+        raise ParseError("No BibTeX entries found")
+    return _records_from_list(parsed)
+
+
+RIS_MAP = {"TI":"title", "T1":"title", "AU":"author", "A1":"author", "PY":"year", "Y1":"year", "DA":"year", "JO":"journal", "JF":"journal", "T2":"journal", "BT":"booktitle", "VL":"volume", "IS":"number", "SP":"startpage", "EP":"endpage", "DO":"doi", "UR":"url", "AB":"abstract", "PB":"publisher", "SN":"issn", "KW":"keywords"}
+RIS_TYPE = {"JOUR":"article", "CONF":"inproceedings", "CPAPER":"inproceedings", "BOOK":"book", "CHAP":"inbook", "THES":"phdthesis", "RPRT":"techreport"}
+
+
+def _ris_records(text: str) -> OrderedDict[str, dict[str, Any]]:
+    parsed = []
+    record: dict[str, Any] = {}
+    for line in text.splitlines() + ["ER  - "]:
+        match = re.match(r"^\s*([A-Z0-9]{2,4})\s+-\s?(.*)$", line)
+        if not match:
+            continue
+        tag, value = match.groups()
+        if tag == "TY":
+            record = {"ENTRYTYPE": RIS_TYPE.get(value.upper(), "misc")}
+        elif tag == "ER":
+            if record:
+                record["ID"] = record.get("ID") or str(len(parsed) + 1)
+                parsed.append(record)
+            record = {}
+        elif tag == "ID":
+            record["ID"] = value
+        else:
+            key = RIS_MAP.get(tag, tag.lower())
+            if key in record:
+                record[key] = [*record[key], value] if isinstance(record[key], list) else [record[key], value]
+            else:
+                record[key] = value
+    for item in parsed:
+        start_page, end_page = item.pop("startpage", None), item.pop("endpage", None)
+        if start_page is not None:
+            item["pages"] = str(start_page) + (f"--{end_page}" if end_page else "")
+        if isinstance(item.get("author"), list):
+            item["author"] = " and ".join(item["author"])
+    if text.strip() and not parsed:
+        raise ParseError("No RIS records found")
+    return _records_from_list(parsed)
+
+
+def parse(text: str, format: str) -> OrderedDict[str, dict[str, Any]]:
+    fmt = normalize_format(format)
+    try:
+        if fmt == "json":
+            return _records_from_list(json.loads(text))
+        if fmt == "csv":
+            rows = list(csv.DictReader(StringIO(text)))
+            return _records_from_list(rows)
+        if fmt == "bib":
+            return _bib_records(text)
+        if fmt == "ris":
+            return _ris_records(text)
+        if fmt in {"md"}:
+            raise OptionalBackendUnavailableError("Markdown reference-list parsing requires an installed bibliography_io.backends 'markdown' backend")
+        if fmt in {"nbib", "enl", "txt"}:
+            return _tagged_records(text, fmt)
+    except (ParseError, OptionalBackendUnavailableError):
+        raise
+    except Exception as exc:
+        raise ParseError(f"Could not parse {fmt} input: {exc}") from exc
+    raise UnsupportedFormatError(f"Reading {fmt} is unsupported")
+
+
+def _tagged_records(text: str, fmt: str) -> OrderedDict[str, dict[str, Any]]:
+    parsed = []
+    current: dict[str, Any] = {}
+    for line in text.splitlines() + (["ER  -"] if fmt == "nbib" else [""]):
+        if fmt == "nbib":
+            match = re.match(r"^([A-Z0-9]{2,4})\s+-\s+(.*)$", line)
+            if match:
+                tag, value = match.groups()
+                if tag == "PMID": current["ID"] = value
+                elif tag == "PT": current["ENTRYTYPE"] = value.lower()
+                else: current.setdefault({"TI":"title", "AU":"author", "DP":"year", "JT":"journal", "AB":"abstract", "DO":"doi", "PG":"pages"}.get(tag, tag.lower()), value)
+                continue
+            if not line.strip() and current:
+                current.setdefault("ENTRYTYPE", "article"); current.setdefault("ID", str(len(parsed) + 1)); parsed.append(current); current = {}
+        else:
+            match = re.match(r"^%([A-Z0-9])\s+(.*)$", line)
+            if match:
+                tag, value = match.groups()
+                key = {"T":"title", "A":"author", "D":"year", "B":"journal", "V":"volume", "N":"number", "P":"pages", "U":"url", "X":"abstract"}.get(tag, tag.lower())
+                current[key] = f"{current[key]} and {value}" if key == "author" and key in current else value
+            elif not line.strip() and current:
+                current.setdefault("ENTRYTYPE", "article"); current.setdefault("ID", str(len(parsed) + 1)); parsed.append(current); current = {}
+    if text.strip() and not parsed:
+        raise ParseError(f"No {fmt.upper()} records found")
+    return _records_from_list(parsed)
+
+
+def _bib_escape(value: Any) -> str:
+    if isinstance(value, (dict, list, tuple, set)):
+        raise SerializationError(f"Cannot serialize non-scalar BibTeX value: {value!r}")
+    return "{" + str(value).replace("}", r"\}") + "}"
+
+
+def serialize(records: Any, format: str) -> str:
+    fmt = normalize_format(format)
+    if fmt not in WRITE_FORMATS:
+        raise UnsupportedFormatError(f"Writing {fmt} is unsupported")
+    data = normalize_records(records)
+    if fmt == "json":
+        return json.dumps(list(data.values()), ensure_ascii=False, indent=2)
+    if fmt == "csv":
+        fields = list(dict.fromkeys(k for record in data.values() for k in record))
+        stream = StringIO(newline="")
+        writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="raise")
+        writer.writeheader(); writer.writerows(data.values())
+        return stream.getvalue()
+    if fmt == "bib":
+        entries = []
+        for record in data.values():
+            fields = [f"  {key} = {_bib_escape(value)}" for key, value in record.items() if key not in {"ID", "ENTRYTYPE"}]
+            entries.append(f"@{record['ENTRYTYPE']}{{{record['ID']},\n" + ",\n".join(fields) + "\n}")
+        return "\n\n".join(entries)
+    if fmt == "ris":
+        reverse = {v:k for k,v in RIS_MAP.items()}
+        lines = []
+        for record in data.values():
+            typ = {"article":"JOUR", "inproceedings":"CONF", "book":"BOOK", "inbook":"CHAP"}.get(record["ENTRYTYPE"], "GEN")
+            lines.append(f"TY  - {typ}")
+            for key, value in record.items():
+                if key in {"ID", "ENTRYTYPE"}: continue
+                values = value if isinstance(value, list) else [value]
+                tag = reverse.get(key, key.upper()[:2])
+                lines.extend(f"{tag}  - {item}" for item in values)
+            lines.extend([f"ID  - {record['ID']}", "ER  - ", ""])
+        return "\n".join(lines).rstrip()
+    if fmt == "md":
+        keys = list(dict.fromkeys(key for row in data.values() for key in row))
+        esc = lambda x: str(x).replace("|", r"\|").replace("\n", " ")
+        return "| " + " | ".join(keys) + " |\n| " + " | ".join("---" for _ in keys) + " |\n" + "\n".join("| " + " | ".join(esc(row.get(k, "")) for k in keys) + " |" for row in data.values())
+    raise UnsupportedFormatError(f"Writing {fmt} is unsupported")

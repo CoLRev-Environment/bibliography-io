@@ -1,75 +1,38 @@
 Usage
 =====
 
-Load and write files
---------------------
-
-The file extension determines the format. Records are returned as a dictionary
-keyed by record ID.
+File APIs infer the format from a recognized suffix. They accept strings or
+``pathlib.Path`` objects, read and write UTF-8 text, and raise
+``FileNotFoundError`` for missing input paths.
 
 .. code-block:: python
-
-   from pathlib import Path
 
    from bibliography_io import load_records, write_records
 
-   records = load_records(filename=Path("references.bib"))
-   write_records(records, filename=Path("references.ris"))
+   records = load_records("references.bib")
+   write_records(records, "references.ris")
 
-Readers support BibTeX (``.bib``), RIS (``.ris``), CSV (``.csv``), Excel
-(``.xls`` and ``.xlsx``), Markdown (``.md``), EndNote (``.enl`` and ``.txt``),
-NBIB (``.nbib``), and JSON (``.json``). Writers support BibTeX, RIS, CSV,
-Excel (``.xlsx``), and Markdown.
-
-Use the shorter aliases ``load`` and ``write`` when using the package namespace:
+Pass ``format`` to override suffix inference. String APIs always require it:
 
 .. code-block:: python
 
-   from pathlib import Path
+   from bibliography_io import dumps, loads
 
-   import bibliography_io as bibio
+   records = loads("@article{example, title={An example}}", format="bib")
+   bibtex = dumps(records, format="bib")
 
-   records = bibio.load(filename=Path("references.bib"))
-   bibio.write(records, filename=Path("references.ris"))
+Core readers support BibTeX, RIS, CSV, Excel (``.xls`` and ``.xlsx``), ENL,
+NBIB, and JSON. Core writers support BibTeX, RIS, CSV, Excel (``.xlsx``), and
+Markdown tables. Markdown table writing is separate from optional Markdown
+reference-list parsing. The latter uses a lazily discovered entry point in
+``bibliography_io.backends`` named ``markdown``; without one,
+``OptionalBackendUnavailableError`` is raised when Markdown input is requested.
 
-The aliases ``load`` and ``write_file`` refer to ``load_records`` and
-``write_records`` respectively.
+Records are ordered mappings keyed by string ``ID`` values. Each record has
+``ID`` and ``ENTRYTYPE`` fields. Source IDs are preserved, missing IDs are
+assigned sequentially without collisions, and duplicate IDs are rejected.
+Unknown fields are retained when the output format can represent them.
 
-Load from a string
-------------------
-
-Use :func:`bibliography_io.loads` when the input is already in memory. The
-``implementation`` argument names the input format:
-
-.. code-block:: python
-
-   from bibliography_io import loads
-
-   records = loads(
-       "@article{example2024, title={An Example}, year={2024}}",
-       implementation="bib",
-   )
-
-DataFrames and record counts
-----------------------------
-
-Use :func:`bibliography_io.load_df` to load records into a pandas DataFrame, or
-:func:`bibliography_io.get_nr_records` to count records without loading the
-full result into a DataFrame.
-
-.. code-block:: python
-
-   from pathlib import Path
-
-   from bibliography_io import get_nr_records, load_df
-
-   filename = Path("references.csv")
-   count = get_nr_records(filename)
-   records_df = load_df(filename)
-
-Optional dependencies
----------------------
-
-The package's public loading and writing functions require CoLRev. Install it
-with ``python -m pip install "bibliography-io[colrev]"``. The ``requests`` extra
-is available separately for optional request-related functionality.
+The historical root functions ``load``, ``write``, ``write_file``,
+``to_string``, ``load_df``, and ``get_nr_records`` are deprecated immediately.
+They remain available during migration and will be removed in a future release.

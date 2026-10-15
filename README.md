@@ -21,37 +21,30 @@ Install the base package with:
 pip install bibliography-io
 ```
 
-The load and write functions use CoLRev's shared metadata definitions. Install
-the `colrev` extra to use them:
-
-```shell
-pip install "bibliography-io[colrev]"
-```
-
 ## Usage
 
 ```python
 from bibliography_io import load_records, write_records
 
-records = load_records(filename="references.bib")
-write_records(records, filename="references.ris")
+records = load_records("references.bib")
+write_records(records, "references.ris")
 ```
 
-`load_records` accepts the same options as the loader's `load()` function;
-`write_records` accepts the same options as the writer's `write_file()` function.
-
-For a shorter namespace-style interface, `load` and `write` are aliases of the
-same functions:
+File formats are inferred from suffixes. String operations require an explicit
+format:
 
 ```python
-import bibliography_io as bibio
+from bibliography_io import dumps, loads
 
-records = bibio.load(filename="references.bib")
-bibio.write(records, filename="references.ris")
+records = loads("@article{example, title={An example}}", format="bib")
+text = dumps(records, format="bib")
 ```
 
-Both patterns share the same implementations and preserve the loader and writer
-options, return values, and supported formats.
+Core operation requires no CoLRev installation. Markdown table writing is
+included; Markdown reference-list parsing requires an optional backend.
+Historical root aliases (`load`, `write`, `write_file`, `to_string`, `load_df`,
+and `get_nr_records`) are deprecated immediately and will be removed in a
+future release.
 
 See the [documentation](https://colrev-environment.github.io/bibliography-io/)
 for installation details, usage examples, and the generated API reference.
