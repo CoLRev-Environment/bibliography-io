@@ -18,23 +18,24 @@ jobs:
       - run: python -m pip install --upgrade pip pre-commit
       - run: pre-commit run --all-files
 
-  tests:
+  core-tests:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install --upgrade pip pytest pytest-mock
-      - run: python -m pip install -e ".[all]"
-      # tests/2_loader exercises CoLRev internals and expects a local GROBID service.
-      - run: pytest tests/test_public_api.py
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[test]"
+      # The root tests/conftest imports CoLRev; this selects the complete standalone
+      # core suite without loading that legacy fixture tree.
+      - run: pytest --confcutdir=tests/core_api tests/core_api
 
-  build:
+  build-and-wheel-smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,3 +45,38 @@ jobs:
       - run: python -m pip install --upgrade pip build twine
       - run: python -m build
       - run: python -m twine check dist/*
+      - run: python -m venv /tmp/bibliography-io-wheel-venv
+      - run: /tmp/bibliography-io-wheel-venv/bin/python -m pip install dist/*.whl
+      - name: Smoke-test installed wheel without optional backends
+        working-directory: /tmp
+        run: |
+          /tmp/bibliography-io-wheel-venv/bin/python - <<'PY'
+          import importlib.util
+          from importlib.metadata import entry_points
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+
+          import bibliography_io
+          from bibliography_io.exceptions import OptionalBackendUnavailableError
+
+          assert importlib.util.find_spec("colrev") is None
+          assert not entry_points().select(
+              group="bibliography_io.backends", name="markdown"
+          )
+          records = bibliography_io.loads(
+              "@article{wheel_smoke, title={Installed wheel}}", format="bib"
+          )
+          assert records["wheel_smoke"]["title"] == "Installed wheel"
+          with TemporaryDirectory() as directory:
+              path = Path(directory) / "smoke.bib"
+              bibliography_io.write_records(records, path)
+              assert bibliography_io.load_records(path) == records
+              markdown = Path(directory) / "references.md"
+              markdown.write_text("# References\n\nA reference", encoding="utf-8")
+              try:
+                  bibliography_io.load_records(markdown)
+              except OptionalBackendUnavailableError:
+                  pass
+              else:
+                  raise AssertionError("Markdown backend should not be installed")
+          PY
