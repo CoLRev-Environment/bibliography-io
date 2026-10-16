@@ -10,8 +10,8 @@
 
 </div>
 
-`bibliography-io` loads and writes bibliographic records in formats including
-BibTeX, RIS, CSV, Excel, Markdown, ENL, NBIB, and JSON.
+`bibliography-io` provides standalone loading and writing of bibliographic
+records. Its core API does not require CoLRev or GROBID.
 
 ## Installation
 
@@ -20,6 +20,10 @@ Install the base package with:
 ```shell
 pip install bibliography-io
 ```
+
+The optional `colrev` extra is for legacy compatibility modules. It is not
+needed by the core file and string APIs. Markdown reference-list parsing has no
+released optional backend yet.
 
 ## Usage
 
@@ -30,8 +34,8 @@ records = load_records("references.bib")
 write_records(records, "references.ris")
 ```
 
-File formats are inferred from suffixes. String operations require an explicit
-format:
+File APIs infer the format from recognized suffixes; an explicit `format` can
+override inference. String APIs always require `format`:
 
 ```python
 from bibliography_io import dumps, loads
@@ -40,26 +44,44 @@ records = loads("@article{example, title={An example}}", format="bib")
 text = dumps(records, format="bib")
 ```
 
-Core operation requires no CoLRev installation. Markdown table writing is
-included; Markdown reference-list parsing requires an optional backend.
-Historical root aliases (`load`, `write`, `write_file`, `to_string`, `load_df`,
-and `get_nr_records`) are deprecated immediately and will be removed in a
-future release.
+### Format support
+
+| Format | Read files | Write files | String APIs |
+| --- | --- | --- | --- |
+| BibTeX | Yes | Yes | `loads` / `dumps` |
+| RIS | Yes | Yes | `loads` / `dumps` |
+| CSV | Yes | Yes | `loads` / `dumps` |
+| Excel | `.xls`, `.xlsx` | `.xlsx` | File APIs only |
+| ENL / EndNote | `.enl`, `.txt` | No | `loads` only |
+| NBIB | Yes | No | `loads` only |
+| JSON | Yes | No | `loads` only |
+| Markdown table | No | Yes | `dumps` |
+| Markdown reference list | Pending optional backend | No | Pending optional backend |
+
+Markdown table serialization is built into the core. Markdown reference-list
+parsing is a separate optional feature; its backend and installation extra are
+not finalized. Requesting Markdown input without a registered backend raises
+``OptionalBackendUnavailableError``.
+
+Historical root aliases (``load``, ``write``, ``write_file``, ``to_string``,
+``load_df``, and ``get_nr_records``) are deprecated immediately and will be
+removed in a future release.
 
 See the [documentation](https://colrev-environment.github.io/bibliography-io/)
 for installation details, usage examples, and the generated API reference.
 
 ## Development
 
-Install the project with its optional runtime dependencies and development
-tools, then run the hooks and test suite:
+Install the package's core test extra and run the standalone core suite. The
+``--confcutdir`` option avoids loading legacy root fixtures, which import
+CoLRev:
 
 ```shell
-pip install -e ".[all]"
-pip install build pre-commit pytest pytest-mock twine
+pip install -e ".[test]"
+pip install build pre-commit
 pre-commit install
 pre-commit run --all-files
-pytest tests/test_public_api.py
+pytest --confcutdir=tests/core_api tests/core_api
 ```
 
 Build the documentation locally with:

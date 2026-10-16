@@ -1,34 +1,43 @@
 bibliography-io
 ===============
 
-``bibliography-io`` loads and writes bibliographic records in common reference
-formats, including BibTeX, RIS, CSV, Excel, Markdown, EndNote, NBIB, and JSON.
-It uses CoLRev's shared metadata definitions for loading and writing records.
+``bibliography-io`` provides standalone APIs for loading and writing
+bibliographic records. Core use does not require CoLRev or GROBID.
 
 Installation
 ------------
 
-Install the ``colrev`` extra to use the load and write functions:
+Install the core package with:
 
 .. code-block:: console
 
-   python -m pip install "bibliography-io[colrev]"
+   python -m pip install bibliography-io
+
+The optional ``colrev`` extra is for legacy compatibility modules, not the
+standalone core API. Markdown reference-list parsing is pending an optional
+backend; Markdown table writing is included in the core.
 
 Quick example
 -------------
 
 .. code-block:: python
 
-   from pathlib import Path
-
    from bibliography_io import load_records, write_records
 
-   records = load_records(filename=Path("references.bib"))
-   write_records(records, filename=Path("references.ris"))
+   records = load_records("references.bib")
+   write_records(records, "references.ris")
 
-The package can also be installed without the ``colrev`` extra, but loading and
-writing records requires it. See :doc:`usage` for more examples and
-:doc:`api` for the generated API reference.
+File APIs infer formats from recognized filename suffixes. String APIs require
+an explicit format:
+
+.. code-block:: python
+
+   from bibliography_io import dumps, loads
+
+   records = loads("@article{example, title={An example}}", format="bib")
+   bibtex = dumps(records, format="bib")
+
+See :doc:`usage` for supported formats and :doc:`api` for the public interface.
 
 .. toctree::
    :maxdepth: 2
