@@ -72,16 +72,15 @@ for installation details, usage examples, and the generated API reference.
 
 ## Development
 
-Install the package's core test extra and run the standalone core suite. The
-``--confcutdir`` option avoids loading legacy root fixtures, which import
-CoLRev:
+Install the package's test extra and run the standalone test suite. The tests
+use the package API and do not require CoLRev:
 
 ```shell
 pip install -e ".[test]"
 pip install build pre-commit
 pre-commit install
 pre-commit run --all-files
-pytest --confcutdir=tests/core_api tests/core_api
+pytest
 ```
 
 Build the documentation locally with:

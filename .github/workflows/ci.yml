@@ -31,9 +31,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[test]"
-      # The root tests/conftest imports CoLRev; this selects the complete standalone
-      # core suite without loading that legacy fixture tree.
-      - run: pytest --confcutdir=tests/core_api tests/core_api
+      - run: pytest
 
   build-and-wheel-smoke:
     runs-on: ubuntu-latest

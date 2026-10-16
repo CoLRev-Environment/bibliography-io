@@ -7,9 +7,10 @@ from pathlib import Path
 
 import pytest
 
-import colrev.exceptions as colrev_exceptions
 import colrev.loader.bib
 import colrev.loader.load_utils
+from bibliography_io.exceptions import ParseError
+from bibliography_io.exceptions import UnsupportedFormatError
 
 # flake8: noqa
 
@@ -19,13 +20,13 @@ def test_load(tmp_path, helpers) -> None:  # type: ignore
     os.chdir(tmp_path)
 
     Path("non-bib-file.bib").write_text("This is not a bib file.")
-    with pytest.raises(colrev_exceptions.UnsupportedImportFormatError):
+    with pytest.raises(ParseError):
         colrev.loader.load_utils.load(
             filename=Path("non-bib-file.bib"),
         )
 
     # only supports bib
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(UnsupportedFormatError):
         os.makedirs("data/search", exist_ok=True)
         Path("data/search/bib_tests.xy").touch()
         try:
@@ -132,5 +133,5 @@ def test_load(tmp_path, helpers) -> None:  # type: ignore
     assert 0 == nr_records
 
     Path("data/search/bib_data2.unkonwn").write_text("This is not a bib file.")
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(UnsupportedFormatError):
         colrev.loader.load_utils.get_nr_records(Path("data/search/bib_data2.unkonwn"))

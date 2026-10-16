@@ -7,13 +7,14 @@ import pytest
 import colrev.loader.load_utils
 from colrev import utils
 from colrev.constants import SearchType
+from bibliography_io.exceptions import UnsupportedFormatError
 
 
 def test_load_md(helpers) -> None:  # type: ignore
     """Test the load utils for md files"""
 
     # only supports md
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(UnsupportedFormatError):
         os.makedirs("data/search", exist_ok=True)
         Path("data/search/table.ptvc").touch()
         try:

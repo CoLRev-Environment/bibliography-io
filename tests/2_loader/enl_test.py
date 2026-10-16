@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 import colrev.loader.load_utils
+from bibliography_io.exceptions import UnsupportedFormatError
 from colrev.constants import ENTRYTYPES
 from colrev.constants import Fields
 from colrev.writer.write_utils import to_string
@@ -18,7 +19,7 @@ def test_load(tmp_path, helpers) -> None:  # type: ignore
     os.chdir(tmp_path)
 
     # only supports enl
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(UnsupportedFormatError):
         os.makedirs("data/search", exist_ok=True)
         Path("data/search/table.ptvc").touch()
         try:

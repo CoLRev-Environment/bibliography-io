@@ -12,6 +12,7 @@ import colrev.loader.ris
 from colrev.packages.unknown_source.src.unknown_source import UnknownSearchSource
 from colrev.constants import ENTRYTYPES
 from colrev.constants import Fields
+from bibliography_io.exceptions import UnsupportedFormatError
 
 NESTED_KNOWLEDGE_TITLES = [
     "Activation of peroxisome-proliferator-receptor alpha and gamma mediates "
@@ -235,7 +236,7 @@ def test_load_ris_entries(tmp_path, helpers):  # type: ignore
             record_dict[key] = str(value)
 
     # only supports ris
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(UnsupportedFormatError):
         os.makedirs("data/search", exist_ok=True)
         Path("data/search/table.ptvc").touch()
         try:

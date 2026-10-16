@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 import colrev.loader.load_utils
+from bibliography_io.exceptions import UnsupportedFormatError
 from colrev.constants import Colors
 from colrev.loader.loader import Loader
 
@@ -47,7 +48,7 @@ def test_load(tmp_path, helpers) -> None:  # type: ignore
         source=Path("2_loader/data/bib_data.bib"),
         target=Path("data/search/bib_tests.xy"),
     )
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(UnsupportedFormatError):
         os.makedirs("data/search", exist_ok=True)
         Path("data/search/bib_tests.xy").touch()
         try:
@@ -71,5 +72,5 @@ def test_load(tmp_path, helpers) -> None:  # type: ignore
         filename=Path("data/search/bib_data.bib"), logger=logging.getLogger(__name__)
     )
 
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(UnsupportedFormatError):
         colrev.loader.load_utils.loads(load_string="content...", implementation="xy")
