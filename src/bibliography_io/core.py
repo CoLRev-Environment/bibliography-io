@@ -59,6 +59,47 @@ def normalize_records(records: Any) -> OrderedDict[str, dict[str, Any]]:
     return output
 
 
+def _records_from_loaded_list(
+    items: list[dict[str, Any]], *, allow_duplicate_ids: bool = False
+) -> OrderedDict[str, dict[str, Any]]:
+    """Build records from a parsed source, optionally retaining duplicate IDs.
+
+    The first occurrence keeps its source ID as the mapping key. Subsequent
+    occurrences get a unique mapping key while the record's ``ID`` remains the
+    original source value. Strict input formats still reject duplicate IDs.
+    """
+    output: OrderedDict[str, dict[str, Any]] = OrderedDict()
+    counts: dict[str, int] = {}
+    for index, raw in enumerate(items, start=1):
+        if not isinstance(raw, dict):
+            raise ParseError("Each record must be a mapping")
+        record = dict(raw)
+        source_id = record.get("ID")
+        if source_id is None or str(source_id).strip() == "":
+            source_id = str(index)
+        source_id = str(source_id)
+        occurrence = counts.get(source_id, 0) + 1 if allow_duplicate_ids else 1
+        counts[source_id] = occurrence
+        key = source_id if occurrence == 1 else f"{source_id}#{occurrence}"
+        if not allow_duplicate_ids and key in output:
+            raise DuplicateRecordIDError(f"Duplicate record ID: {source_id}")
+        while allow_duplicate_ids and key in output:
+            occurrence += 1
+            counts[source_id] = occurrence
+            key = f"{source_id}#{occurrence}"
+        if key in output:
+            raise DuplicateRecordIDError(f"Duplicate record ID: {source_id}")
+        record["ID"] = source_id
+        entrytype = record.get("ENTRYTYPE", "misc")
+        if not isinstance(entrytype, str) or not entrytype.strip():
+            raise RecordValidationError(
+                f"record {source_id!r} has an invalid ENTRYTYPE"
+            )
+        record["ENTRYTYPE"] = entrytype.lower()
+        output[key] = record
+    return output
+
+
 def _records_from_list(items: Any) -> OrderedDict[str, dict[str, Any]]:
     if not isinstance(items, list):
         raise ParseError("Expected a list of record objects")
@@ -84,7 +125,7 @@ def _records_from_list(items: Any) -> OrderedDict[str, dict[str, Any]]:
             raise DuplicateRecordIDError(f"Duplicate record ID: {record['ID']}")
         used.add(record["ID"])
         pending.append(record)
-    return normalize_records(OrderedDict((x["ID"], x) for x in pending))
+    return _records_from_loaded_list(pending)
 
 
 def _bib_records(text: str) -> OrderedDict[str, dict[str, Any]]:
@@ -139,7 +180,7 @@ def _bib_records(text: str) -> OrderedDict[str, dict[str, Any]]:
         parsed.append(record)
     if text.strip() and not parsed:
         raise ParseError("No BibTeX entries found")
-    return _records_from_list(parsed)
+    return _records_from_loaded_list(parsed, allow_duplicate_ids=True)
 
 
 RIS_MAP = {
