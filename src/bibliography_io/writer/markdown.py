@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from colrev.constants import Fields
+from bibliography_io.constants import Fields
 
 FIELDS = [
     Fields.ID,

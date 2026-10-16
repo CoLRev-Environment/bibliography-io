@@ -126,7 +126,10 @@ def write_records(records: Any, path: str | Path, *, format: str | None = None) 
 
 def _markdown_table(records: dict[str, dict[str, Any]]) -> str:
     fields = list(dict.fromkeys(key for record in records.values() for key in record))
-    clean = lambda value: str(value).replace("|", r"\|").replace("\n", " ")
+
+    def clean(value: Any) -> str:
+        return str(value).replace("|", r"\|").replace("\n", " ")
+
     lines = [
         "| " + " | ".join(fields) + " |",
         "| " + " | ".join("---" for _ in fields) + " |",

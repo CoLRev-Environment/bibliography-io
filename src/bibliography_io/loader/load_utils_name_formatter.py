@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 import typing
 
-from colrev.constants import Fields
+from bibliography_io.constants import Fields
 
 
 def split_tex_string(

@@ -9,8 +9,8 @@ import typing
 from pathlib import Path
 
 import colrev.loader.loader
-from colrev.constants import ENTRYTYPES
-from colrev.constants import Fields
+from bibliography_io.constants import ENTRYTYPES
+from bibliography_io.constants import Fields
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=too-many-arguments

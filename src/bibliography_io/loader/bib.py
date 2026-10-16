@@ -13,9 +13,7 @@ from pathlib import Path
 
 import colrev.exceptions as colrev_exceptions
 import colrev.loader.loader
-from colrev.constants import Fields
-from colrev.constants import FieldSet
-from colrev.constants import RecordState
+from bibliography_io.constants import Fields
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=too-many-arguments
@@ -218,13 +216,14 @@ def store_current_key_value(
     if not current_key or not current_record:
         return
 
-    if current_key in [Fields.MD_PROV, Fields.D_PROV]:
+    if current_key in {Fields.MD_PROV, Fields.D_PROV}:
         current_record[current_key] = parse_provenance(current_value.strip(", {}"))
     elif current_key == Fields.STATUS:
-        current_record[current_key] = RecordState[current_value.strip(", {}")]
+        # Workflow-state interpretation and enum conversion belong to CoLRev.
+        current_record[current_key] = extract_content(current_value)
     elif current_key == Fields.DOI:
         current_record[current_key] = current_value.strip(", {} ").upper()
-    elif current_key in [Fields.ORIGIN] + list(FieldSet.LIST_FIELDS):
+    elif current_key == Fields.ORIGIN:
         current_record[current_key] = [
             el.strip(";")
             for el in current_value.strip(", {} ").split("; ")
@@ -256,9 +255,9 @@ def process_lines(
 
     header_fields = {
         Fields.ID,
+        Fields.FILE,
         Fields.ORIGIN,
         Fields.STATUS,
-        Fields.FILE,
         Fields.SCREENING_CRITERIA,
         Fields.MD_PROV,
     }

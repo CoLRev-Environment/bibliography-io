@@ -12,7 +12,7 @@ import requests
 import colrev.env.grobid_service
 import colrev.loader.load_utils
 import colrev.loader.loader
-from colrev.constants import Fields
+from bibliography_io.constants import Fields
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=duplicate-code

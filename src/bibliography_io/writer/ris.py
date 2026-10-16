@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-from colrev.constants import ENTRYTYPES
-from colrev.constants import Fields
+from bibliography_io.constants import ENTRYTYPES
+from bibliography_io.constants import Fields
 
 RECORDS_FIELD_ORDER = [
     "TY",  # Must be the first field

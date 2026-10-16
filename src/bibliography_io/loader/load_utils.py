@@ -143,8 +143,8 @@ from . import json as json_loader
 from . import nbib as nbib_loader
 from . import ris as ris_loader
 from . import table as table_loader
-from colrev.constants import ENTRYTYPES
-from colrev.constants import Fields
+from bibliography_io.constants import ENTRYTYPES
+from bibliography_io.constants import Fields
 
 # pylint: disable=too-many-arguments
 # flake8: noqa: E501

@@ -8,9 +8,7 @@ import re
 
 import colrev.env.language_service
 import colrev.exceptions as colrev_exceptions
-from colrev.constants import Fields
-from colrev.constants import FieldValues
-from colrev.constants import RecordState
+from bibliography_io.constants import Fields
 
 # pylint: disable=too-few-public-methods
 
@@ -148,7 +146,7 @@ class LoadFormatter:
             record.data[field] = record.data[field].replace("\n", " ").rstrip().lstrip()
 
     def _standardize_field_values(self, *, record: colrev.record.record.Record) -> None:
-        if record.data.get(Fields.TITLE, FieldValues.UNKNOWN) != FieldValues.UNKNOWN:
+        if record.data.get(Fields.TITLE, "UNKNOWN") != "UNKNOWN":
             record.data[Fields.TITLE] = re.sub(
                 r"\s+", " ", record.data[Fields.TITLE]
             ).rstrip(".")
@@ -177,12 +175,6 @@ class LoadFormatter:
     def run(self, record: colrev.record.record.Record) -> None:
         """Run the load formatter."""
         self._apply_strict_requirements(record=record)
-
-        if (
-            Fields.STATUS in record.data
-            and record.data[Fields.STATUS] != RecordState.md_retrieved
-        ):
-            return
 
         self._unescape_field_values(record=record)
         self._standardize_field_values(record=record)

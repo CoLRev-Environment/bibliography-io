@@ -6,7 +6,7 @@ from __future__ import annotations
 from copy import deepcopy
 from pathlib import Path
 
-from colrev.constants import Fields
+from bibliography_io.constants import Fields
 
 RECORDS_FIELD_ORDER = [
     Fields.ORIGIN,  # must be in second line
