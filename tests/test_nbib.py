@@ -13,12 +13,11 @@ DATA = Path(__file__).parent / "data" / "nbib"
 def test_load_nbib_fixture() -> None:
     records = load_records(DATA / "load.nbib")
     expected = load_records(DATA / "load_expected.bib")
-    assert len(records) == 1
     record = next(iter(records.values()))
     expected_record = next(iter(expected.values()))
-    assert record["title"] == expected_record["title"]
-    assert record["author"] == expected_record["author"]
-    assert record["year"] == expected_record["year"]
+    assert record == expected_record
+    assert record["ID"] == "1"
+    assert record["pmid"] == "12345678"
 
 
 def test_nbib_load_write_as_bibtex(tmp_path: Path) -> None:

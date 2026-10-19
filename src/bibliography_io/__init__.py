@@ -10,6 +10,7 @@ from typing import Any
 
 from .core import normalize_format
 from .core import _records_from_loaded_list
+from .core import normalize_source_record
 from .core import normalize_records
 from .core import parse
 from .core import serialize
@@ -89,10 +90,16 @@ def load_records(
 
         try:
             rows = pd.read_excel(source).fillna("").to_dict(orient="records")
-            records = _records_from_loaded_list(rows, allow_duplicate_ids=True)
-            for record in records.values():
-                record.setdefault("ENTRYTYPE", "misc")
-            return records
+            return _records_from_loaded_list(
+                [
+                    normalize_source_record(
+                        {**row, "id": row.get("id", row.get("ID"))}, format=fmt
+                    )
+                    for row in rows
+                ],
+                allow_duplicate_ids=True,
+                generate_ids=True,
+            )
         except Exception as exc:
             raise ParseError(f"Could not parse {fmt} file {source}: {exc}") from exc
     text = source.read_text(encoding="utf-8-sig")

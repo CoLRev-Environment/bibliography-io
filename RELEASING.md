@@ -1,55 +1,75 @@
 # Releasing
 
-The initial release version proposed for this project is `0.1.0`. Before
-publishing, confirm that version and the package name with the maintainers.
+The initial release version proposed for this project is `0.1.0`. Confirm the
+version and package name with the maintainers before publishing.
 
-## Pre-release checks
+## Required pre-release checks
 
-1. Make sure the release changes are merged to the default branch and the CI
-   checks pass.
-2. The current CI exercises `tests/test_public_api.py`; the legacy tests under
-   `tests/2_loader` call into CoLRev internals and the Markdown integration test
-   expects a local GROBID service. Before describing the full loader suite as
-   supported, adapt those tests to the published API and provide the required
-   services, or document the supported CoLRev version and test setup.
-3. Update `project.version` in `pyproject.toml` and add release notes to the
-   GitHub release. This project currently uses a static version; keep the
-   version in `pyproject.toml` and the Git tag in sync.
-4. Build and validate the exact artifacts that will be released:
+1. Ensure the CI test job passes for the supported Python versions. It installs
+   `bibliography-io` and its test extra without CoLRev or GROBID, then runs the
+   complete standalone test suite:
+
+   ```shell
+   python -m pip install -e ".[test]"
+   pytest
+   ```
+
+   The test suite exercises the public bibliography-io API and repository data
+   fixtures without importing CoLRev.
+2. Build and validate the release artifacts, then install the wheel into a clean
+   environment without optional extras:
 
    ```shell
    python -m pip install --upgrade build twine
    python -m build
    python -m twine check dist/*
+   python -m venv /tmp/bibliography-io-wheel-smoke
+   /tmp/bibliography-io-wheel-smoke/bin/python -m pip install dist/*.whl
    ```
 
-5. Upload the artifacts to TestPyPI and verify installation in a clean virtual
-   environment. Use a TestPyPI token or configure TestPyPI Trusted Publishing:
+   From outside the source checkout, smoke-test imports and a BibTeX file
+   round-trip with the installed wheel. The wheel test must not install the
+   `colrev`, `requests`, or Markdown backend extras.
+3. Markdown table output is part of core testing. Markdown reference-list
+   parsing is pending an optional backend; test it separately after the backend
+   package, entry-point protocol, and installation extra are finalized.
+4. Update `project.version` in `pyproject.toml`, add release notes, and keep the
+   version in the Git tag synchronized with package metadata.
 
-   ```shell
-   python -m twine upload --repository testpypi dist/*
-   python -m pip install --index-url https://test.pypi.org/simple/ \
-       --extra-index-url https://pypi.org/simple/ "bibliography-io[all]==0.1.0"
-   ```
+## TestPyPI verification
 
-   Check that imports, load/write examples, and the published metadata work as
-   expected. The `--extra-index-url` lets dependencies not mirrored on TestPyPI
-   resolve from PyPI.
+Upload the built artifacts and test installation of the core package without
+optional extras:
+
+```shell
+python -m twine upload --repository testpypi dist/*
+python -m venv /tmp/bibliography-io-testpypi
+/tmp/bibliography-io-testpypi/bin/python -m pip install \
+    --index-url https://test.pypi.org/simple/ \
+    --extra-index-url https://pypi.org/simple/ \
+    "bibliography-io==0.1.0"
+```
+
+Repeat the installed-wheel smoke test against the TestPyPI installation. The
+`--extra-index-url` allows runtime dependencies not mirrored on TestPyPI to
+resolve from PyPI.
 
 ## PyPI publication with GitHub Actions
 
 `.github/workflows/publish.yml` builds distributions and publishes them to PyPI
 when a GitHub Release is published. Before using it:
 
-1. Create the `bibliography-io` project on PyPI (or arrange the initial
-   publisher account) and configure a PyPI Trusted Publisher for this GitHub
-   repository, the `publish.yml` workflow, and the `pypi` environment.
-2. Create the matching `pypi` GitHub environment. Add any required protection
-   rules or reviewers according to the maintainers' release policy.
-3. Publish a GitHub Release only after TestPyPI verification. The release tag
-   should be `v<version>` (for example, `v0.1.0`) and match
-   `project.version` in `pyproject.toml`.
+1. Create the `bibliography-io` project on PyPI and configure a Trusted
+   Publisher for this repository, the `publish.yml` workflow, and the `pypi`
+   environment.
+2. Create the matching GitHub `pypi` environment and configure any required
+   protection rules.
+3. Publish only after CI and TestPyPI verification pass. Use a `v<version>` tag
+   matching `project.version` (for example, `v0.1.0`).
 
-The workflow publishes to the live PyPI project; TestPyPI upload and verification
-are intentionally a pre-release step. The PyPI project owner, exact release date,
-and release approval policy remain maintainer decisions.
+## Compatibility status
+
+The standalone bibliography-io API and its format-specific data fixtures are
+covered without CoLRev or GROBID. Historical CoLRev-facing compatibility
+wrappers are outside the standalone test suite. Markdown reference-list parsing
+is optional and remains unverified until its backend is finalized and tested.

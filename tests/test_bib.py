@@ -26,8 +26,7 @@ def test_loading_preserves_duplicate_record_ids() -> None:
 
     assert len(repeated) == 2
     assert len(set(records)) == len(records)
-    assert len({record["doi"] for record in repeated}) == 1
-    assert next(iter({record["doi"] for record in repeated})).endswith("04a")
+    assert {record["doi"] for record in repeated} == {"10.3333/XYZ.V4444.04a"}
 
 
 def test_loading_matches_expected_bibtex() -> None:
@@ -35,12 +34,19 @@ def test_loading_matches_expected_bibtex() -> None:
     expected = load_records(DATA / "load_expected.bib")
 
     assert len(records) == len(expected)
+    assert list(records) == list(expected)
     for record, expected_record in zip(records.values(), expected.values()):
         assert record["ENTRYTYPE"] == expected_record["ENTRYTYPE"]
-        assert record["year"] == expected_record["year"]
-        assert record["title"].replace("\n   ", " ") == expected_record[
-            "title"
-        ].replace("\n   ", " ")
+        assert record["ID"] == expected_record["ID"]
+        for key, expected_value in expected_record.items():
+            actual_value = record[key]
+            if isinstance(actual_value, str) and isinstance(expected_value, str):
+                assert " ".join(actual_value.split()) == " ".join(
+                    expected_value.split()
+                )
+            else:
+                assert actual_value == expected_value
+        assert set(record) >= set(expected_record)
 
 
 def test_unique_id_round_trip_uses_expected_fixtures(tmp_path: Path) -> None:

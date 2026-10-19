@@ -20,6 +20,141 @@ READ_FORMATS = {"bib", "ris", "csv", "xls", "xlsx", "enl", "txt", "nbib", "json"
 WRITE_FORMATS = {"bib", "ris", "csv", "xlsx", "md"}
 ALIASES = {"bibtex": "bib", "markdown": "md", "excel": "xlsx", "endnote": "enl"}
 
+FIELD_ALIASES = {
+    "title": "title",
+    "ti": "title",
+    "t1": "title",
+    "authors": "author",
+    "author": "author",
+    "au": "author",
+    "a1": "author",
+    "publication_year": "year",
+    "publicationyear": "year",
+    "year": "year",
+    "py": "year",
+    "dp": "year",
+    "y1": "year",
+    "doi": "doi",
+    "do": "doi",
+    "aid": "doi",
+    "journal": "journal",
+    "journal_book": "journal_book",
+    "journalbook": "journal_book",
+    "container_title": "container_title",
+    "jo": "journal",
+    "jf": "journal",
+    "ja": "journal_abbreviation",
+    "t2": "journal",
+    "booktitle": "booktitle",
+    "bt": "booktitle",
+    "volume": "volume",
+    "vl": "volume",
+    "vi": "volume",
+    "vo": "volume",
+    "number": "number",
+    "issue": "number",
+    "is": "number",
+    "ip": "number",
+    "pages": "pages",
+    "pg": "pages",
+    "url": "url",
+    "ur": "url",
+    "issn": "issn",
+    "sn": "issn",
+    "abstract": "abstract",
+    "ab": "abstract",
+    "keywords": "keywords",
+    "kw": "keywords",
+    "pmid": "pmid",
+    "pubmed_id": "pubmed_id",
+    "pmcid": "pmcid",
+    "nihms_id": "nihms_id",
+    "first_author": "first_author",
+    "citation": "citation",
+    "journal_abbreviation": "journal_abbreviation",
+    "create_date": "create_date",
+    "date": "date",
+    "number_of_cited_references": "number_of_cited_references",
+    "file_name": "file_name",
+    "author_count": "author_count",
+    "citation_key": "citation_key",
+    "cited_by": "cited_by",
+    "source_type": "source_type",
+    "type": "type",
+    "id": "id",
+    "entrytype": "ENTRYTYPE",
+}
+
+_TABLE_FORMATS = {"csv", "xlsx", "xls"}
+
+
+def normalize_field_name(value: str) -> str:
+    """Normalize arbitrary source field labels to bibliography-io field names."""
+    name = re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+    name = re.sub(r"_+", "_", name)
+    return FIELD_ALIASES.get(name, name)
+
+
+def normalize_source_record(
+    record: dict[str, Any], *, format: str | None = None
+) -> dict[str, Any]:
+    """Normalize source field names and combine aliases without losing values."""
+    normalized: dict[str, Any] = {}
+    raw_entrytype = record.get("ENTRYTYPE")
+    for field, value in record.items():
+        if field in {"ID", "ENTRYTYPE"}:
+            normalized[field] = value
+            continue
+        if str(field).lower() == "entrytype":
+            normalized["ENTRYTYPE"] = value
+            continue
+        key = normalize_field_name(str(field))
+        if key == "id" and format in _TABLE_FORMATS:
+            normalized[key] = value
+            continue
+        if key == "journal_book":
+            if format in _TABLE_FORMATS:
+                if record.get("journal"):
+                    key = "container_title"
+                elif record.get("booktitle"):
+                    key = "booktitle"
+                elif value:
+                    key = "journal"
+                else:
+                    key = "booktitle"
+            elif raw_entrytype == "inproceedings" or record.get("booktitle"):
+                key = "booktitle"
+            elif raw_entrytype == "article":
+                key = "journal"
+            else:
+                key = "booktitle"
+        if key not in normalized or normalized[key] in (None, ""):
+            normalized[key] = value
+            continue
+        previous = normalized[key]
+        if key in {"journal", "volume", "number", "year"} and isinstance(
+            previous, list
+        ):
+            previous.append(value)
+            continue
+        if key in {"journal", "volume", "number", "year"} and previous != value:
+            normalized[key] = [previous, value]
+            continue
+        if isinstance(previous, list):
+            previous.append(value)
+        elif previous != value:
+            normalized[key] = [previous, value]
+    return normalized
+
+
+def normalize_source_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Normalize a table of records while assigning standard bibliography fields."""
+    normalized = []
+    for row in rows:
+        record = normalize_source_record(row, format="csv")
+        normalized.append(record)
+    return normalized
+
 
 def normalize_format(value: str) -> str:
     name = value.lower().lstrip(".")
@@ -38,6 +173,7 @@ def normalize_records(records: Any) -> OrderedDict[str, dict[str, Any]]:
         if not isinstance(raw, dict):
             raise RecordValidationError(f"record {mapping_id!r} must be a mapping")
         record = dict(raw)
+        record = normalize_source_record(record)
         record_id = record.get("ID", mapping_id)
         if record_id is None or str(record_id).strip() == "":
             candidate = 1
@@ -60,7 +196,10 @@ def normalize_records(records: Any) -> OrderedDict[str, dict[str, Any]]:
 
 
 def _records_from_loaded_list(
-    items: list[dict[str, Any]], *, allow_duplicate_ids: bool = False
+    items: list[dict[str, Any]],
+    *,
+    allow_duplicate_ids: bool = False,
+    generate_ids: bool = False,
 ) -> OrderedDict[str, dict[str, Any]]:
     """Build records from a parsed source, optionally retaining duplicate IDs.
 
@@ -73,11 +212,15 @@ def _records_from_loaded_list(
     for index, raw in enumerate(items, start=1):
         if not isinstance(raw, dict):
             raise ParseError("Each record must be a mapping")
-        record = dict(raw)
-        source_id = record.get("ID")
+        record = normalize_source_record(dict(raw))
+        if generate_ids:
+            record.pop("ID", None)
+        source_id = None if generate_ids else record.get("ID")
         if source_id is None or str(source_id).strip() == "":
             source_id = str(index)
         source_id = str(source_id)
+        if generate_ids:
+            source_id = str(index)
         occurrence = counts.get(source_id, 0) + 1 if allow_duplicate_ids else 1
         counts[source_id] = occurrence
         key = source_id if occurrence == 1 else f"{source_id}#{occurrence}"
@@ -113,7 +256,7 @@ def _records_from_list(items: Any) -> OrderedDict[str, dict[str, Any]]:
     for item in items:
         if not isinstance(item, dict):
             raise ParseError("Each record must be a JSON object")
-        record = dict(item)
+        record = normalize_source_record(dict(item))
         record_id = record.get("ID")
         if not record_id:
             n = 1
@@ -163,6 +306,8 @@ def _bib_records(text: str) -> OrderedDict[str, dict[str, Any]]:
             "ID": entry.group(2),
             "ENTRYTYPE": entry.group(1).lower(),
         }
+        if "#" in record["ID"]:
+            record["ID"] = record["ID"].rsplit("#", 1)[0]
         for field in re.finditer(
             r"([\w-]+)\s*=\s*(\{(?:[^{}]|\{[^{}]*\})*\}|\"(?:[^\"]|\\.)*\"|[^,\s]+)\s*,?",
             body,
@@ -177,7 +322,7 @@ def _bib_records(text: str) -> OrderedDict[str, dict[str, Any]]:
             ):
                 value = value[1:-1]
             record[field.group(1).lower()] = value.strip()
-        parsed.append(record)
+        parsed.append(normalize_source_record(record, format="bib"))
     if text.strip() and not parsed:
         raise ParseError("No BibTeX entries found")
     return _records_from_loaded_list(parsed, allow_duplicate_ids=True)
@@ -205,6 +350,7 @@ RIS_MAP = {
     "PB": "publisher",
     "SN": "issn",
     "KW": "keywords",
+    "PMID": "pubmed_id",
 }
 RIS_TYPE = {
     "JOUR": "article",
@@ -227,6 +373,10 @@ def _ris_records(text: str) -> OrderedDict[str, dict[str, Any]]:
         tag, value = match.groups()
         if tag == "TY":
             record = {"ENTRYTYPE": RIS_TYPE.get(value.upper(), "misc")}
+        elif tag == "VO":
+            record["volume"] = value
+        elif tag == "JA":
+            record["journal_abbreviation"] = value
         elif tag == "ER":
             if record:
                 record["ID"] = record.get("ID") or str(len(parsed) + 1)
@@ -235,7 +385,7 @@ def _ris_records(text: str) -> OrderedDict[str, dict[str, Any]]:
         elif tag == "ID":
             record["ID"] = value
         else:
-            key = RIS_MAP.get(tag, tag.lower())
+            key = RIS_MAP.get(tag, normalize_field_name(tag))
             if key in record:
                 record[key] = (
                     [*record[key], value]
@@ -252,7 +402,7 @@ def _ris_records(text: str) -> OrderedDict[str, dict[str, Any]]:
             item["author"] = " and ".join(item["author"])
     if text.strip() and not parsed:
         raise ParseError("No RIS records found")
-    return _records_from_list(parsed)
+    return _records_from_loaded_list(parsed)
 
 
 def parse(text: str, format: str) -> OrderedDict[str, dict[str, Any]]:
@@ -262,7 +412,10 @@ def parse(text: str, format: str) -> OrderedDict[str, dict[str, Any]]:
             return _records_from_list(json.loads(text))
         if fmt == "csv":
             rows = list(csv.DictReader(StringIO(text)))
-            return _records_from_list(rows)
+            return _records_from_loaded_list(
+                normalize_source_rows(rows),
+                generate_ids=True,
+            )
         if fmt == "bib":
             return _bib_records(text)
         if fmt == "ris":
@@ -286,12 +439,26 @@ def _tagged_records(text: str, fmt: str) -> OrderedDict[str, dict[str, Any]]:
     for line in text.splitlines() + (["ER  -"] if fmt == "nbib" else [""]):
         if fmt == "nbib":
             match = re.match(r"^([A-Z0-9]{2,4})\s+-\s+(.*)$", line)
+            if not line.strip() and current:
+                current.setdefault("ENTRYTYPE", "article")
+                current.setdefault("ID", str(len(parsed) + 1))
+                parsed.append(current)
+                current = {}
+                continue
+            if not line.strip():
+                continue
             if match:
                 tag, value = match.groups()
-                if tag == "PMID":
-                    current["ID"] = value
+                if tag == "ER":
+                    if current:
+                        current.setdefault("ENTRYTYPE", "article")
+                        current.setdefault("ID", str(len(parsed) + 1))
+                        parsed.append(current)
+                        current = {}
+                elif tag == "PMID":
+                    current["pmid"] = value
                 elif tag == "PT":
-                    current["ENTRYTYPE"] = value.lower()
+                    current["type"] = normalize_field_name(value)
                 else:
                     current.setdefault(
                         {
@@ -299,10 +466,13 @@ def _tagged_records(text: str, fmt: str) -> OrderedDict[str, dict[str, Any]]:
                             "AU": "author",
                             "DP": "year",
                             "JT": "journal",
+                            "VI": "volume",
+                            "IP": "number",
                             "AB": "abstract",
                             "DO": "doi",
+                            "AID": "doi",
                             "PG": "pages",
-                        }.get(tag, tag.lower()),
+                        }.get(tag, normalize_field_name(tag)),
                         value,
                     )
                 continue
@@ -311,7 +481,10 @@ def _tagged_records(text: str, fmt: str) -> OrderedDict[str, dict[str, Any]]:
                 current.setdefault("ID", str(len(parsed) + 1))
                 parsed.append(current)
                 current = {}
-        else:
+                continue
+            if not line.strip() and not current:
+                continue
+        elif fmt != "nbib":
             match = re.match(r"^%([A-Z0-9])\s+(.*)$", line)
             if match:
                 tag, value = match.groups()
@@ -325,20 +498,30 @@ def _tagged_records(text: str, fmt: str) -> OrderedDict[str, dict[str, Any]]:
                     "P": "pages",
                     "U": "url",
                     "X": "abstract",
-                }.get(tag, tag.lower())
-                current[key] = (
-                    f"{current[key]} and {value}"
-                    if key == "author" and key in current
-                    else value
-                )
+                }.get(tag, normalize_field_name(tag))
+                if tag == "0":
+                    current["type"] = normalize_field_name(value)
+                elif tag == "8":
+                    current["date"] = value
+                else:
+                    current[key] = (
+                        f"{current[key]} and {value}"
+                        if key == "author" and key in current
+                        else value
+                    )
             elif not line.strip() and current:
                 current.setdefault("ENTRYTYPE", "article")
                 current.setdefault("ID", str(len(parsed) + 1))
                 parsed.append(current)
                 current = {}
+    if fmt == "nbib" and current:
+        current.setdefault("ENTRYTYPE", "article")
+        current.setdefault("ID", str(len(parsed) + 1))
+        parsed.append(current)
     if text.strip() and not parsed:
         raise ParseError(f"No {fmt.upper()} records found")
-    return _records_from_list(parsed)
+    normalized = [normalize_source_record(row, format=fmt) for row in parsed]
+    return _records_from_loaded_list(normalized, generate_ids=(fmt == "nbib"))
 
 
 def _bib_escape(value: Any) -> str:

@@ -14,20 +14,23 @@ def test_load_xlsx_fixture() -> None:
     records = load_records(ORIGINAL_DUPLICATE_FIXTURE)
     expected = load_records(DATA / "load_expected.bib")
     assert len(records) == len(expected) == 3
-    ids = [record["ID"] for record in records.values()]
-    assert ids.count("Id_0001") == 3
-    assert list(records) == ["Id_0001", "Id_0001#2", "Id_0001#3"]
-    assert all(record["Title"] == "Paper title" for record in records.values())
-    for key, record in records.items():
-        expected_record = expected[key]
-        assert record["ID"] == expected_record["id"]
-        assert record["Title"] == expected_record["title"]
+    assert list(records) == ["1", "2", "3"]
+    assert all(r["title"] == "Paper title" for r in records.values())
+    assert [r["type"] for r in records.values()] == [
+        "article",
+        "inproceedings",
+        "techreport",
+    ]
 
 
 def test_xlsx_load_write_round_trip(tmp_path: Path) -> None:
-    records = load_records(DATA / "write_expected.bib")
+    records = {
+        "one": {"ID": "one", "ENTRYTYPE": "article", "title": "One"},
+        "two": {"ID": "two", "ENTRYTYPE": "article", "title": "Two"},
+    }
     output = tmp_path / "roundtrip.xlsx"
     write_records(records, output)
     reloaded = load_records(output)
-    assert list(reloaded) == ["one", "two"]
-    assert reloaded == records
+    assert list(reloaded) == ["1", "2"]
+    assert [row["title"] for row in reloaded.values()] == ["One", "Two"]
+    assert [row["id"] for row in reloaded.values()] == ["one", "two"]
