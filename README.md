@@ -92,6 +92,16 @@ python -m sphinx -W --keep-going -b html docs docs/_build/html
 
 See [RELEASING.md](RELEASING.md) for the package build and publication process.
 
+## Related Python BibTeX Libraries
+
+The following Python libraries provide functionality for parsing and managing BibTeX files:
+
+- **[BibtexParser](https://github.com/sciunto-org/python-bibtexparser)** — A lightweight, actively maintained library for reading, writing, and modifying `.bib` files. Supports customizable parsing, field transformations, and BibTeX serialization. Best suited for general-purpose BibTeX processing.
+
+- **[Pybtex](https://pybtex.org/)** — A bibliography processing library that supports BibTeX parsing, citation formatting, and conversion between bibliography formats. Provides extensible formatting styles and output formats such as LaTeX, HTML, and plain text. Best suited for generating formatted references.
+
+- **[biblib](https://pypi.org/project/biblib/)** — A library for managing bibliographic databases, including merging entries, accessing metadata, and retrieving references using DOI or ISBN identifiers. Useful for building custom bibliography management workflows, although its last PyPI release was in 2018.
+
 ## License
 
 This project is distributed under the [MIT License](LICENSE).
