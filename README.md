@@ -50,19 +50,19 @@ text = dumps(records, format="bib")
 
 | Format | Read files | Write files | String APIs |
 | --- | --- | --- | --- |
-| BibTeX | Yes | Yes | `loads` / `dumps` |
-| RIS | Yes | Yes | `loads` / `dumps` |
-| CSV | Yes | Yes | `loads` / `dumps` |
-| Excel | `.xls`, `.xlsx` | `.xlsx` | File APIs only |
-| ENL / EndNote | `.enl`, `.txt` | No | `loads` only |
-| NBIB | Yes | No | `loads` only |
-| JSON | Yes | No | `loads` only |
-| Markdown table | No | Yes | `dumps` |
-| Markdown reference list | Pending optional backend | No | Pending optional backend |
+| BibTeX (`.bib`) | Yes | Yes | `loads` / `dumps` |
+| RIS (`.ris`) | Yes | Yes | `loads` / `dumps` |
+| CSV (`.csv`) | Yes | Yes | `loads` / `dumps` |
+| Excel (`.xls`, `.xlsx`) | Yes | Yes | File APIs only |
+| ENL / EndNote (`.enl`, `.txt`) | Yes | *Planned* | `loads` only |
+| NBIB (`.nbib`) | Yes | *Planned* | `loads` only |
+| JSON (`.json`) | Yes | *Planned* | `loads` only |
+| Markdown (`.md`) | *Planned* | *Planned* | *Planned* |
 
-Markdown table serialization is built into the core. Markdown reference-list
-parsing is a separate optional feature; its backend and installation extra are
-not finalized. Requesting Markdown input without a registered backend raises
+Markdown table serialization is built into the core.
+Markdown reference-list parsing is planned as a separate optional feature; its
+backend and installation extra are not finalized. Requesting Markdown
+reference-list input without a registered backend raises
 ``OptionalBackendUnavailableError``.
 
 Historical root aliases (``load``, ``write``, ``write_file``, ``to_string``,
