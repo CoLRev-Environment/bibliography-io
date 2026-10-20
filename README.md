@@ -52,11 +52,11 @@ text = dumps(records, format="bib")
 | --- | --- | --- | --- |
 | BibTeX (`.bib`) | Yes | Yes | `loads` / `dumps` |
 | RIS (`.ris`) | Yes | Yes | `loads` / `dumps` |
+| ENL / EndNote (`.enl`) | Yes | *Planned* | `loads` (`dumps` planned) |
+| NBIB (`.nbib`) | Yes | *Planned* | `loads` (`dumps` planned) |
+| JSON (`.json`) | Yes | *Planned* | `loads` (`dumps` planned) |
 | CSV (`.csv`) | Yes | Yes | `loads` / `dumps` |
 | Excel (`.xls`, `.xlsx`) | Yes | Yes | File APIs only |
-| ENL / EndNote (`.enl`, `.txt`) | Yes | *Planned* | `loads` only |
-| NBIB (`.nbib`) | Yes | *Planned* | `loads` only |
-| JSON (`.json`) | Yes | *Planned* | `loads` only |
 | Markdown (`.md`) | *Planned* | *Planned* | *Planned* |
 
 Markdown table serialization is built into the core.
@@ -64,10 +64,6 @@ Markdown reference-list parsing is planned as a separate optional feature; its
 backend and installation extra are not finalized. Requesting Markdown
 reference-list input without a registered backend raises
 ``OptionalBackendUnavailableError``.
-
-Historical root aliases (``load``, ``write``, ``write_file``, ``to_string``,
-``load_df``, and ``get_nr_records``) are deprecated immediately and will be
-removed in a future release.
 
 See the [documentation](https://colrev-environment.github.io/bibliography-io/)
 for installation details, usage examples, and the generated API reference.
