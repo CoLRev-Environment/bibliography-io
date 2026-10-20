@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/_static/bibliography_io_logo.png" alt="bibliography-io logo" width="400">
+
 # bibliography-io
 
 [![PyPI - Version](https://img.shields.io/pypi/v/bibliography-io?color=blue)](https://pypi.org/project/bibliography-io/)

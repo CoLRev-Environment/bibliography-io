@@ -13,6 +13,7 @@ extensions = [
 ]
 
 templates_path = ["_templates"]
+html_static_path = ["_static"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 autodoc_member_order = "bysource"
@@ -21,3 +22,5 @@ autodoc_typehints = "description"
 html_theme = "sphinx_rtd_theme"
 html_title = "bibliography-io documentation"
 html_baseurl = "https://colrev-environment.github.io/bibliography-io/"
+html_logo = "_static/bibliography_io_logo.png"
+html_favicon = "_static/favicon.ico"
