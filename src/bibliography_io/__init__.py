@@ -36,6 +36,43 @@ def _format_from_path(path: str | Path, format: str | None) -> str:
     return normalize_format(suffix)
 
 
+def _structured_fields(
+    fmt: str,
+    mapping_fields: Any,
+    list_fields: Any,
+) -> tuple[frozenset[str], frozenset[str]]:
+    """Validate and normalize explicitly-declared structured field names."""
+    if fmt != "bib":
+        try:
+            has_fields = bool(mapping_fields) or bool(list_fields)
+        except (TypeError, ValueError) as exc:
+            raise RecordValidationError(
+                "mapping_fields and list_fields must be iterables of field names"
+            ) from exc
+        if has_fields:
+            raise UnsupportedFormatError(
+                "mapping_fields and list_fields are only supported for BibTeX"
+            )
+        return frozenset(), frozenset()
+    try:
+        mappings = frozenset(mapping_fields)
+        lists = frozenset(list_fields)
+    except TypeError as exc:
+        raise RecordValidationError(
+            "mapping_fields and list_fields must be iterables of field names"
+        ) from exc
+    if any(not isinstance(field, str) or not field for field in mappings | lists):
+        raise RecordValidationError(
+            "mapping_fields and list_fields must contain non-empty strings"
+        )
+    overlap = mappings & lists
+    if overlap:
+        raise RecordValidationError(
+            f"Fields cannot be declared as both mappings and lists: {sorted(overlap)}"
+        )
+    return mappings, lists
+
+
 def _markdown_backend(text: str, source: str | Path) -> Any:
     points = entry_points()
     matches = (
@@ -64,25 +101,45 @@ def _markdown_backend(text: str, source: str | Path) -> Any:
     )
 
 
-def loads(text: str, *, format: str) -> dict[str, dict[str, Any]]:
-    """Parse bibliographic records from text using an explicit format."""
+def loads(
+    text: str,
+    *,
+    format: str,
+    mapping_fields: Any = (),
+    list_fields: Any = (),
+) -> dict[str, dict[str, Any]]:
+    """Parse records from text.
+
+    For BibTeX, ``mapping_fields`` and ``list_fields`` declare field names whose
+    values use bibliography-io's versioned structured-value encoding. Supplying
+    either option for other formats raises :class:`UnsupportedFormatError`.
+    Declared field names match the lowercased BibTeX names.
+    """
     if not isinstance(text, str):
         raise TypeError("text must be str")
     fmt = normalize_format(format)
+    mappings, lists = _structured_fields(fmt, mapping_fields, list_fields)
     if fmt == "md":
         return _markdown_backend(text, "<string>")
-    return parse(text, fmt)
+    return parse(text, fmt, mapping_fields=mappings, list_fields=lists)
 
 
 def load_records(
-    path: str | Path, *, format: str | None = None
+    path: str | Path,
+    *,
+    format: str | None = None,
+    mapping_fields: Any = (),
+    list_fields: Any = (),
 ) -> dict[str, dict[str, Any]]:
     """Load records from a UTF-8 file; infer its format from the suffix by default.
 
-    A missing path raises :class:`FileNotFoundError`.
+    A missing path raises :class:`FileNotFoundError`. For BibTeX, callers may
+    declare structured fields with ``mapping_fields`` and ``list_fields``;
+    these options are unsupported for other formats.
     """
     source = Path(path)
     fmt = _format_from_path(source, format)
+    mappings, lists = _structured_fields(fmt, mapping_fields, list_fields)
     if not source.is_file():
         raise FileNotFoundError(source)
     if fmt in {"xls", "xlsx"}:
@@ -105,23 +162,49 @@ def load_records(
     text = source.read_text(encoding="utf-8-sig")
     if fmt == "md":
         return _markdown_backend(text, source)
-    return parse(text, fmt)
+    return parse(text, fmt, mapping_fields=mappings, list_fields=lists)
 
 
-def dumps(records: Any, *, format: str) -> str:
-    """Serialize records to text using an explicit format."""
+def dumps(
+    records: Any,
+    *,
+    format: str,
+    mapping_fields: Any = (),
+    list_fields: Any = (),
+) -> str:
+    """Serialize records to text.
+
+    For BibTeX, ``mapping_fields`` and ``list_fields`` declare fields to encode
+    as structured values. Supplying either option for other formats raises
+    :class:`UnsupportedFormatError`. The declared names match the record field
+    names (matching is case-insensitive, as BibTeX field names are).
+    """
     fmt = normalize_format(format)
+    mappings, lists = _structured_fields(fmt, mapping_fields, list_fields)
     if fmt in {"xlsx", "xls"}:
         raise UnsupportedFormatError(
             "Excel is a file format and cannot be serialized to text"
         )
-    return serialize(records, fmt)
+    return serialize(records, fmt, mapping_fields=mappings, list_fields=lists)
 
 
-def write_records(records: Any, path: str | Path, *, format: str | None = None) -> None:
-    """Write records to a file, replacing existing contents."""
+def write_records(
+    records: Any,
+    path: str | Path,
+    *,
+    format: str | None = None,
+    mapping_fields: Any = (),
+    list_fields: Any = (),
+) -> None:
+    """Write records, replacing existing contents.
+
+    For BibTeX, ``mapping_fields`` and ``list_fields`` declare fields to encode
+    as structured values. Supplying either option for other formats raises
+    :class:`UnsupportedFormatError`.
+    """
     destination = Path(path)
     fmt = _format_from_path(destination, format)
+    mappings, lists = _structured_fields(fmt, mapping_fields, list_fields)
     normalized = normalize_records(records)
     if fmt == "xlsx":
         import pandas as pd
@@ -131,7 +214,7 @@ def write_records(records: Any, path: str | Path, *, format: str | None = None) 
     if fmt == "md":
         output = _markdown_table(normalized)
     else:
-        output = serialize(normalized, fmt)
+        output = serialize(normalized, fmt, mapping_fields=mappings, list_fields=lists)
     destination.write_text(output, encoding="utf-8")
 
 

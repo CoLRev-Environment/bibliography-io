@@ -59,6 +59,44 @@ Records are ordered mappings keyed by string ``ID`` values. Each record has
 assigned sequentially without collisions; duplicate IDs raise an error.
 Unknown fields are retained where the output format can represent them.
 
+Structured BibTeX fields
+------------------------
+
+Nested mappings and lists can be serialized in BibTeX when callers explicitly
+declare their field names. Use ``mapping_fields`` for top-level mappings and
+``list_fields`` for top-level lists; nested lists/mappings within those values
+are preserved automatically.
+
+.. code-block:: python
+
+   from bibliography_io import dumps, loads
+
+   provenance = {"CURATED": {"source": "github...", "note": ""}}
+   records = {
+       "example": {
+           "ENTRYTYPE": "article",
+           "colrev_masterdata_provenance": provenance,
+       }
+   }
+   text = dumps(
+       records,
+       format="bib",
+       mapping_fields=["colrev_masterdata_provenance"],
+   )
+   restored = loads(
+       text,
+       format="bib",
+       mapping_fields=["colrev_masterdata_provenance"],
+   )
+
+The file APIs accept the same options. The ``bibio-json-v1:`` encoding uses
+compact JSON encoded as UTF-8 and Base64 inside a standard BibTeX braced value.
+It preserves JSON strings, delimiters, braces, quotes, backslashes, Unicode,
+booleans, numbers, nulls, and empty/nested containers. Undeclared mappings and
+lists still raise ``SerializationError``. Structured-field options supplied to
+non-BibTeX formats raise ``UnsupportedFormatError``. See ``CONTRACT.md`` for the
+full encoding and error contract.
+
 Compatibility aliases
 ----------------------
 

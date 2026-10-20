@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import base64
 import json
 import re
 from collections import OrderedDict
@@ -86,6 +87,7 @@ FIELD_ALIASES = {
 }
 
 _TABLE_FORMATS = {"csv", "xlsx", "xls"}
+_STRUCTURED_BIB_PREFIX = "bibio-json-v1:"
 
 
 def normalize_field_name(value: str) -> str:
@@ -271,7 +273,31 @@ def _records_from_list(items: Any) -> OrderedDict[str, dict[str, Any]]:
     return _records_from_loaded_list(pending)
 
 
-def _bib_records(text: str) -> OrderedDict[str, dict[str, Any]]:
+def _decode_structured_bib_value(value: str, field: str) -> Any:
+    """Decode a versioned JSON value stored in a declared BibTeX field."""
+    if not value.startswith(_STRUCTURED_BIB_PREFIX):
+        raise ParseError(
+            f"BibTeX field {field!r} is declared structured but does not use "
+            f"the {_STRUCTURED_BIB_PREFIX!r} encoding"
+        )
+    encoded = value[len(_STRUCTURED_BIB_PREFIX) :]
+    try:
+        payload = base64.b64decode(encoded, validate=True).decode("utf-8")
+        result = json.loads(payload)
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ParseError(
+            f"Malformed structured value in BibTeX field {field!r}"
+        ) from exc
+    if not isinstance(result, (dict, list)):
+        raise ParseError(
+            f"Structured BibTeX field {field!r} must decode to a mapping or list"
+        )
+    return result
+
+
+def _bib_records(
+    text: str, *, mapping_fields: frozenset[str], list_fields: frozenset[str]
+) -> OrderedDict[str, dict[str, Any]]:
     parsed = []
     for entry in re.finditer(r"@([\w-]+)\s*[{(]\s*([^,\s]+)\s*,", text):
         start = entry.end()
@@ -321,7 +347,35 @@ def _bib_records(text: str) -> OrderedDict[str, dict[str, Any]]:
                 and value.endswith('"')
             ):
                 value = value[1:-1]
-            record[field.group(1).lower()] = value.strip()
+            field_name = field.group(1).lower()
+            value = value.strip()
+            if field_name in mapping_fields | list_fields:
+                if not field.group(2).strip().startswith("{"):
+                    raise ParseError(
+                        f"Structured BibTeX field {field_name!r} must use a braced value"
+                    )
+                value = value.lstrip("{").rstrip("}")
+                prefix_index = value.find(_STRUCTURED_BIB_PREFIX)
+                if prefix_index >= 0:
+                    value = value[prefix_index:]
+            if field_name in mapping_fields:
+                decoded = _decode_structured_bib_value(value, field_name)
+                if not isinstance(decoded, dict):
+                    raise ParseError(
+                        f"BibTeX field {field_name!r} was declared as a mapping "
+                        "field but does not decode to a mapping"
+                    )
+                record[field_name] = decoded
+            elif field_name in list_fields:
+                decoded = _decode_structured_bib_value(value, field_name)
+                if not isinstance(decoded, list):
+                    raise ParseError(
+                        f"BibTeX field {field_name!r} was declared as a list "
+                        "field but does not decode to a list"
+                    )
+                record[field_name] = decoded
+            else:
+                record[field_name] = value
         parsed.append(normalize_source_record(record, format="bib"))
     if text.strip() and not parsed:
         raise ParseError("No BibTeX entries found")
@@ -405,7 +459,13 @@ def _ris_records(text: str) -> OrderedDict[str, dict[str, Any]]:
     return _records_from_loaded_list(parsed)
 
 
-def parse(text: str, format: str) -> OrderedDict[str, dict[str, Any]]:
+def parse(
+    text: str,
+    format: str,
+    *,
+    mapping_fields: frozenset[str] = frozenset(),
+    list_fields: frozenset[str] = frozenset(),
+) -> OrderedDict[str, dict[str, Any]]:
     fmt = normalize_format(format)
     try:
         if fmt == "json":
@@ -417,7 +477,9 @@ def parse(text: str, format: str) -> OrderedDict[str, dict[str, Any]]:
                 generate_ids=True,
             )
         if fmt == "bib":
-            return _bib_records(text)
+            return _bib_records(
+                text, mapping_fields=mapping_fields, list_fields=list_fields
+            )
         if fmt == "ris":
             return _ris_records(text)
         if fmt in {"md"}:
@@ -530,7 +592,29 @@ def _bib_escape(value: Any) -> str:
     return "{" + str(value).replace("}", r"\}") + "}"
 
 
-def serialize(records: Any, format: str) -> str:
+def _encode_structured_bib_value(value: Any, field: str) -> str:
+    """Encode mappings/lists as deterministic ASCII-safe JSON in a BibTeX value."""
+    try:
+        payload = json.dumps(
+            value,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise SerializationError(
+            f"Cannot serialize structured BibTeX field {field!r}: {exc}"
+        ) from exc
+    return _STRUCTURED_BIB_PREFIX + base64.b64encode(payload).decode("ascii")
+
+
+def serialize(
+    records: Any,
+    format: str,
+    *,
+    mapping_fields: frozenset[str] = frozenset(),
+    list_fields: frozenset[str] = frozenset(),
+) -> str:
     fmt = normalize_format(format)
     if fmt not in WRITE_FORMATS:
         raise UnsupportedFormatError(f"Writing {fmt} is unsupported")
@@ -547,11 +631,24 @@ def serialize(records: Any, format: str) -> str:
     if fmt == "bib":
         entries = []
         for record in data.values():
-            fields = [
-                f"  {key} = {_bib_escape(value)}"
-                for key, value in record.items()
-                if key not in {"ID", "ENTRYTYPE"}
-            ]
+            fields = []
+            for key, value in record.items():
+                if key in {"ID", "ENTRYTYPE"}:
+                    continue
+                field_name = key.lower()
+                if field_name in mapping_fields | list_fields:
+                    expected_type = dict if field_name in mapping_fields else list
+                    expected_label = "mapping" if expected_type is dict else "list"
+                    if not isinstance(value, expected_type):
+                        raise SerializationError(
+                            f"BibTeX field {key!r} was declared as a {expected_label} "
+                            f"field but has value {value!r}"
+                        )
+                    fields.append(
+                        f"  {key} = {{{_encode_structured_bib_value(value, key)}}}"
+                    )
+                else:
+                    fields.append(f"  {key} = {_bib_escape(value)}")
             entries.append(
                 f"@{record['ENTRYTYPE']}{{{record['ID']},\n"
                 + ",\n".join(fields)
