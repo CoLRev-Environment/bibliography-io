@@ -24,5 +24,5 @@ def test_markdown_table_write(tmp_path: Path) -> None:
     assert r"A \| sample" in text
 
     output = tmp_path / "table.md"
-    write_records(records, output)
+    write_records(records, path=output)
     assert "| title |" in output.read_text(encoding="utf-8")

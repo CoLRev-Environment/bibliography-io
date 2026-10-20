@@ -67,7 +67,7 @@ jobs:
           assert records["wheel_smoke"]["title"] == "Installed wheel"
           with TemporaryDirectory() as directory:
               path = Path(directory) / "smoke.bib"
-              bibliography_io.write_records(records, path)
+              bibliography_io.write_records(records, path=path)
               assert bibliography_io.load_records(path) == records
               markdown = Path(directory) / "references.md"
               markdown.write_text("# References\n\nA reference", encoding="utf-8")

@@ -45,8 +45,23 @@ def test_file_api_round_trip(tmp_path: Path) -> None:
         }
     }
     source = tmp_path / "input.bib"
-    write_records(records, source)
+    write_records(records, path=source)
     assert load_records(source) == records
+
+
+def test_write_records_requires_keyword_path(tmp_path: Path) -> None:
+    records = {"example": {"ID": "example", "ENTRYTYPE": "article"}}
+    output = tmp_path / "example.bib"
+
+    write_records(records, path=output)
+    assert output.is_file()
+
+    try:
+        write_records(records, output)
+    except TypeError:
+        pass
+    else:
+        raise AssertionError("write_records must reject a positional path")
 
 
 def test_bibtex_and_ris_round_trip(tmp_path: Path) -> None:
@@ -55,11 +70,11 @@ def test_bibtex_and_ris_round_trip(tmp_path: Path) -> None:
     )
 
     bib_path = tmp_path / "roundtrip.bib"
-    write_records(records, bib_path)
+    write_records(records, path=bib_path)
     assert load_records(bib_path) == records
 
     ris_path = tmp_path / "roundtrip.ris"
-    write_records(records, ris_path)
+    write_records(records, path=ris_path)
     ris_records = load_records(ris_path)
     ris_record = next(iter(ris_records.values()))
     source_record = next(iter(records.values()))

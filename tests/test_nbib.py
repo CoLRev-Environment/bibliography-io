@@ -24,7 +24,7 @@ def test_nbib_load_write_as_bibtex(tmp_path: Path) -> None:
     records = load_records(DATA / "load_expected.bib")
     text = dumps(records, format="bib")
     output = tmp_path / "from-nbib.bib"
-    write_records(records, output)
+    write_records(records, path=output)
 
     assert "@article" in text
     assert load_records(output) == records

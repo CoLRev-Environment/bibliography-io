@@ -56,7 +56,7 @@ def test_unique_id_round_trip_uses_expected_fixtures(tmp_path: Path) -> None:
     expected_text = (DATA / "write_expected.bib").read_text(encoding="utf-8")
     text = dumps(records, format="bib")
     output = tmp_path / "written.bib"
-    write_records(records, output)
+    write_records(records, path=output)
 
     assert text.strip() == expected_text.strip()
     assert load_records(output) == records
@@ -193,7 +193,7 @@ def test_structured_file_api_round_trip(tmp_path: Path) -> None:
     records = {"example": {"ENTRYTYPE": "article", "provenance": value}}
     path = tmp_path / "structured.bib"
 
-    write_records(records, path, mapping_fields=["provenance"])
+    write_records(records, path=path, mapping_fields=["provenance"])
 
     assert (
         load_records(path, mapping_fields=["provenance"])["example"]["provenance"]

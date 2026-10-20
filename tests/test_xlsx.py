@@ -29,7 +29,7 @@ def test_xlsx_load_write_round_trip(tmp_path: Path) -> None:
         "two": {"ID": "two", "ENTRYTYPE": "article", "title": "Two"},
     }
     output = tmp_path / "roundtrip.xlsx"
-    write_records(records, output)
+    write_records(records, path=output)
     reloaded = load_records(output)
     assert list(reloaded) == ["1", "2"]
     assert [row["title"] for row in reloaded.values()] == ["One", "Two"]

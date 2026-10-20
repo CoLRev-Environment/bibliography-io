@@ -15,7 +15,7 @@ UTF-8 and missing files raise ``FileNotFoundError``.
    from bibliography_io import load_records, write_records
 
    records = load_records(Path("references.bib"))
-   write_records(records, "references.ris")
+   write_records(records, path="references.ris")
 
 String APIs require an explicit ``format``:
 

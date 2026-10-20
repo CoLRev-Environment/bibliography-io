@@ -30,7 +30,7 @@ def test_csv_load_write_round_trip(tmp_path: Path) -> None:
     records = load_records(DATA / "write_expected.bib")
     text = dumps(records, format="csv")
     output = tmp_path / "roundtrip.csv"
-    write_records(records, output)
+    write_records(records, path=output)
 
     assert len(loads(text, format="csv")) == len(records)
     assert len(load_records(output)) == len(records)
@@ -42,7 +42,7 @@ def test_csv_load_write_round_trip(tmp_path: Path) -> None:
 def test_csv_fixture_writes_and_reloads(tmp_path: Path) -> None:
     records = load_records(DATA / "load.csv")
     output = tmp_path / "fixture-roundtrip.csv"
-    write_records(records, output)
+    write_records(records, path=output)
     written = load_records(output)
     assert len(written) == len(records)
     for before, after in zip(records.values(), written.values()):

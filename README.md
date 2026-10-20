@@ -33,7 +33,7 @@ released optional backend yet.
 from bibliography_io import load_records, write_records
 
 records = load_records("references.bib")
-write_records(records, "references.ris")
+write_records(records, path="references.ris")
 ```
 
 File APIs infer the format from recognized suffixes; an explicit `format` can

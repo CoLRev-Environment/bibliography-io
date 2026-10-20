@@ -48,7 +48,7 @@ def test_enl_records_write_to_bibtex(tmp_path: Path) -> None:
     records = load_records(DATA / "load_expected.bib")
     text = dumps(records, format="bib")
     output = tmp_path / "from-enl.bib"
-    write_records(records, output)
+    write_records(records, path=output)
 
     assert text.strip() == dumps(records, format="bib").strip()
     assert load_records(output) == records

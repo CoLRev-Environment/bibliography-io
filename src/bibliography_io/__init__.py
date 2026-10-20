@@ -190,8 +190,8 @@ def dumps(
 
 def write_records(
     records: Any,
-    path: str | Path,
     *,
+    path: str | Path,
     format: str | None = None,
     mapping_fields: Any = (),
     list_fields: Any = (),
@@ -279,7 +279,7 @@ def write(records: Any, path: str | Path | None = None, **kwargs: Any) -> None:
         raise TypeError("write() requires a path")
     if kwargs:
         raise TypeError(f"Unexpected legacy write options: {', '.join(kwargs)}")
-    write_records(records, path)
+    write_records(records, path=path)
 
 
 def write_file(records: Any, path: str | Path | None = None, **kwargs: Any) -> None:
@@ -289,7 +289,7 @@ def write_file(records: Any, path: str | Path | None = None, **kwargs: Any) -> N
         path = kwargs.pop("filename", None)
     if path is None or kwargs:
         raise TypeError("write_file() requires only records and path")
-    write_records(records, path)
+    write_records(records, path=path)
 
 
 def to_string(*, records_dict: Any, implementation: str, **kwargs: Any) -> str:

@@ -53,7 +53,7 @@ def test_ris_load_write_round_trip(tmp_path: Path) -> None:
     records = load_records(DATA / "write_expected.bib")
     text = dumps(records, format="ris")
     output = tmp_path / "roundtrip.ris"
-    write_records(records, output)
+    write_records(records, path=output)
 
     expected = load_records(DATA / "write_expected.ris")
     assert loads(text, format="ris") == expected
@@ -63,14 +63,14 @@ def test_ris_load_write_round_trip(tmp_path: Path) -> None:
 def test_ris_writer_preserves_all_fixture_records(tmp_path: Path) -> None:
     records = load_records(DATA / "load.ris")
     output = tmp_path / "fixture-roundtrip.ris"
-    write_records(records, output)
+    write_records(records, path=output)
     assert len(load_records(output)) == len(records)
 
 
 def test_ris_write_file_matches_expected_fixture(tmp_path: Path) -> None:
     records = load_records(DATA / "write_expected.bib")
     output = tmp_path / "written.ris"
-    write_records(records, output)
+    write_records(records, path=output)
     assert loads(output.read_text(encoding="utf-8"), format="ris") == load_records(
         DATA / "write_expected.ris"
     )

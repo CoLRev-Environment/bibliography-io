@@ -25,7 +25,7 @@ Quick example
    from bibliography_io import load_records, write_records
 
    records = load_records("references.bib")
-   write_records(records, "references.ris")
+   write_records(records, path="references.ris")
 
 File APIs infer formats from recognized filename suffixes. String APIs require
 an explicit format:
