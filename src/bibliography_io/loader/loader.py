@@ -8,7 +8,6 @@ from pathlib import Path
 from bibliography_io.constants import Colors
 from bibliography_io.constants import ENTRYTYPES
 from bibliography_io.constants import Fields
-from colrev.loader.load_utils_name_formatter import parse_names_in_records
 
 # pylint: disable=too-many-arguments
 
@@ -25,7 +24,6 @@ class Loader:
         id_labeler: typing.Callable,
         unique_id_field: str,
         logger: logging.Logger,
-        format_names: bool = False,
     ):
         """Initialize the instance."""
         self.filename = filename
@@ -37,7 +35,6 @@ class Loader:
         self.id_labeler = id_labeler
         self.entrytype_setter = entrytype_setter
         self.field_mapper = field_mapper
-        self.format_names = format_names
 
         self.logger = logger
 
@@ -122,8 +119,5 @@ class Loader:
         records_dict = {str(r[Fields.ID]): r for r in records_list}
         self._set_entrytypes(records_dict)
         self._set_fields(records_dict)
-
-        if self.format_names:
-            parse_names_in_records(records_dict)
 
         return records_dict

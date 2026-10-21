@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pandas as pd
 
-import colrev.exceptions as colrev_exceptions
 import colrev.loader.loader
+from bibliography_io.exceptions import ParseError
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=too-many-arguments
@@ -65,9 +65,7 @@ class TableLoader(colrev.loader.loader.Loader):
                 raise NotImplementedError
 
         except pd.errors.ParserError as exc:  # pragma: no cover
-            raise colrev_exceptions.ImportException(
-                f"Error: Not a valid file? {self.filename.name}"
-            ) from exc
+            raise ParseError(f"Error: Not a valid file? {self.filename.name}") from exc
 
         data = data.fillna("").astype(str)
 

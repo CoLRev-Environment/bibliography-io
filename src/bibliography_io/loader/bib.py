@@ -11,9 +11,9 @@ import string
 import typing
 from pathlib import Path
 
-import colrev.exceptions as colrev_exceptions
 import colrev.loader.loader
 from bibliography_io.constants import Fields
+from bibliography_io.exceptions import UnsupportedFormatError
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=too-many-arguments
@@ -150,7 +150,7 @@ def check_valid_bib(filename: Path, logger: logging.Logger) -> None:
         if len(contents.strip()) > 0:
             if len(re.findall(bib_r, contents)) == 0:
                 logger.error(f"Not a bib file? {filename.name}")
-                raise colrev_exceptions.UnsupportedImportFormatError(filename)
+                raise UnsupportedFormatError(f"Not a BibTeX file: {filename}")
 
 
 def parse_provenance(value: str) -> dict:
