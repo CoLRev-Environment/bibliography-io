@@ -4,7 +4,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 import bibliography_io as bibio
+from bibliography_io import load
 from bibliography_io import load_records
 from bibliography_io import write_records
 
@@ -62,6 +65,24 @@ def test_write_records_requires_keyword_path(tmp_path: Path) -> None:
         pass
     else:
         raise AssertionError("write_records must reject a positional path")
+
+
+def test_deprecated_load_alias_delegates_to_core_api(tmp_path: Path) -> None:
+    source = tmp_path / "input.bib"
+    source.write_text("@article{example, title={Example}}", encoding="utf-8")
+
+    with pytest.warns(DeprecationWarning):
+        records = load(source)
+
+    assert records[0]["title"] == "Example"
+
+
+def test_deprecated_load_alias_rejects_legacy_colrev_options(
+    tmp_path: Path,
+) -> None:
+    with pytest.warns(DeprecationWarning):
+        with pytest.raises(TypeError, match="CoLRev-specific load options"):
+            load(tmp_path / "input.bib", entrytype_setter=lambda record: None)
 
 
 def test_bibtex_and_ris_round_trip(tmp_path: Path) -> None:

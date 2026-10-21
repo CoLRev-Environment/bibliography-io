@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import warnings
 from importlib.metadata import entry_points
 from pathlib import Path
@@ -238,29 +237,28 @@ def _deprecated(name: str) -> None:
     )
 
 
-def load(path: str | Path | None = None, **kwargs: Any) -> dict:
-    """Deprecated compatibility entry point for historical CoLRev options."""
+def load(path: str | Path | None = None, **kwargs: Any) -> list[dict[str, Any]]:
+    """Deprecated alias for :func:`load_records` without legacy CoLRev options."""
     _deprecated("load")
     if path is None:
         path = kwargs.pop("filename", None)
     if path is None:
         raise TypeError("load() requires a path")
-    if kwargs and set(kwargs) <= {
+    legacy_options = {
         "entrytype_setter",
         "field_mapper",
         "id_labeler",
         "unique_id_field",
         "logger",
         "empty_if_file_not_exists",
-    }:
-        try:
-            return importlib.import_module(".loader.load_utils", __name__).load(
-                filename=path, **kwargs
-            )
-        except ImportError as exc:
-            raise ImportError(
-                "Legacy load options require the CoLRev compatibility adapter"
-            ) from exc
+        "format_names",
+    }
+    unsupported = legacy_options & kwargs.keys()
+    if unsupported:
+        raise TypeError(
+            "CoLRev-specific load options are no longer supported by "
+            f"bibliography_io.load(): {', '.join(sorted(unsupported))}"
+        )
     return load_records(path, **kwargs)
 
 
