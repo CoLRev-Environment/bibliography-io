@@ -167,6 +167,35 @@ def normalize_format(value: str) -> str:
 
 
 def normalize_records(records: Any) -> OrderedDict[str, dict[str, Any]]:
+    if isinstance(records, list):
+        output: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        for index, raw in enumerate(records, start=1):
+            if not isinstance(raw, dict):
+                raise RecordValidationError(
+                    f"record at position {index} must be a mapping"
+                )
+            record = normalize_source_record(dict(raw))
+            record_id = record.get("ID")
+            if record_id is None or str(record_id).strip() == "":
+                record_id = str(index)
+                record["ID"] = record_id
+            record_id = str(record_id)
+            record.setdefault("ENTRYTYPE", "misc")
+            if (
+                not isinstance(record["ENTRYTYPE"], str)
+                or not record["ENTRYTYPE"].strip()
+            ):
+                raise RecordValidationError(
+                    f"record {record_id!r} has an invalid ENTRYTYPE"
+                )
+            record["ENTRYTYPE"] = record["ENTRYTYPE"].lower()
+            key = record_id
+            suffix = 2
+            while key in output:
+                key = f"{record_id}#{suffix}"
+                suffix += 1
+            output[key] = record
+        return output
     if not hasattr(records, "items"):
         raise RecordValidationError("records must be a mapping of IDs to records")
     output: OrderedDict[str, dict[str, Any]] = OrderedDict()
@@ -199,78 +228,27 @@ def normalize_records(records: Any) -> OrderedDict[str, dict[str, Any]]:
 
 def _records_from_loaded_list(
     items: list[dict[str, Any]],
-    *,
-    allow_duplicate_ids: bool = False,
-    generate_ids: bool = False,
-) -> OrderedDict[str, dict[str, Any]]:
-    """Build records from a parsed source, optionally retaining duplicate IDs.
-
-    The first occurrence keeps its source ID as the mapping key. Subsequent
-    occurrences get a unique mapping key while the record's ``ID`` remains the
-    original source value. Strict input formats still reject duplicate IDs.
-    """
-    output: OrderedDict[str, dict[str, Any]] = OrderedDict()
-    counts: dict[str, int] = {}
-    for index, raw in enumerate(items, start=1):
+) -> list[dict[str, Any]]:
+    """Normalize parsed records without changing IDs or collapsing duplicates."""
+    output: list[dict[str, Any]] = []
+    for raw in items:
         if not isinstance(raw, dict):
             raise ParseError("Each record must be a mapping")
         record = normalize_source_record(dict(raw))
-        if generate_ids:
-            record.pop("ID", None)
-        source_id = None if generate_ids else record.get("ID")
-        if source_id is None or str(source_id).strip() == "":
-            source_id = str(index)
-        source_id = str(source_id)
-        if generate_ids:
-            source_id = str(index)
-        occurrence = counts.get(source_id, 0) + 1 if allow_duplicate_ids else 1
-        counts[source_id] = occurrence
-        key = source_id if occurrence == 1 else f"{source_id}#{occurrence}"
-        if not allow_duplicate_ids and key in output:
-            raise DuplicateRecordIDError(f"Duplicate record ID: {source_id}")
-        while allow_duplicate_ids and key in output:
-            occurrence += 1
-            counts[source_id] = occurrence
-            key = f"{source_id}#{occurrence}"
-        if key in output:
-            raise DuplicateRecordIDError(f"Duplicate record ID: {source_id}")
-        record["ID"] = source_id
         entrytype = record.get("ENTRYTYPE", "misc")
         if not isinstance(entrytype, str) or not entrytype.strip():
             raise RecordValidationError(
-                f"record {source_id!r} has an invalid ENTRYTYPE"
+                f"record {record.get('ID')!r} has an invalid ENTRYTYPE"
             )
         record["ENTRYTYPE"] = entrytype.lower()
-        output[key] = record
+        output.append(record)
     return output
 
 
-def _records_from_list(items: Any) -> OrderedDict[str, dict[str, Any]]:
+def _records_from_list(items: Any) -> list[dict[str, Any]]:
     if not isinstance(items, list):
         raise ParseError("Expected a list of record objects")
-    pending = []
-    source_ids = {
-        str(item["ID"])
-        for item in items
-        if isinstance(item, dict) and item.get("ID") not in (None, "")
-    }
-    used: set[str] = set()
-    for item in items:
-        if not isinstance(item, dict):
-            raise ParseError("Each record must be a JSON object")
-        record = normalize_source_record(dict(item))
-        record_id = record.get("ID")
-        if not record_id:
-            n = 1
-            while str(n) in source_ids or str(n) in used:
-                n += 1
-            record_id = str(n)
-        record["ID"] = str(record_id)
-        if record["ID"] in used:
-            raise DuplicateRecordIDError(f"Duplicate record ID: {record['ID']}")
-        used.add(record["ID"])
-        pending.append(record)
-    return _records_from_loaded_list(pending)
+    return _records_from_loaded_list(items)
 
 
 def _decode_structured_bib_value(value: str, field: str) -> Any:
@@ -297,12 +275,12 @@ def _decode_structured_bib_value(value: str, field: str) -> Any:
 
 def _bib_records(
     text: str, *, mapping_fields: frozenset[str], list_fields: frozenset[str]
-) -> OrderedDict[str, dict[str, Any]]:
+) -> list[dict[str, Any]]:
     parsed = []
     for entry in re.finditer(r"@([\w-]+)\s*[{(]\s*([^,\s]+)\s*,", text):
         start = entry.end()
         depth, brace, quoted, escaped, end = 1, 0, False, False, start
-        opening = text[entry.start() : entry.end()].rstrip()[-1]
+        opening = "{" if "{" in entry.group(0) else "("
         closing = "}" if opening == "{" else ")"
         while end < len(text):
             char = text[end]
@@ -332,8 +310,6 @@ def _bib_records(
             "ID": entry.group(2),
             "ENTRYTYPE": entry.group(1).lower(),
         }
-        if "#" in record["ID"]:
-            record["ID"] = record["ID"].rsplit("#", 1)[0]
         for field in re.finditer(
             r"([\w-]+)\s*=\s*(\{(?:[^{}]|\{[^{}]*\})*\}|\"(?:[^\"]|\\.)*\"|[^,\s]+)\s*,?",
             body,
@@ -379,7 +355,7 @@ def _bib_records(
         parsed.append(normalize_source_record(record, format="bib"))
     if text.strip() and not parsed:
         raise ParseError("No BibTeX entries found")
-    return _records_from_loaded_list(parsed, allow_duplicate_ids=True)
+    return _records_from_loaded_list(parsed)
 
 
 RIS_MAP = {
@@ -417,7 +393,7 @@ RIS_TYPE = {
 }
 
 
-def _ris_records(text: str) -> OrderedDict[str, dict[str, Any]]:
+def _ris_records(text: str) -> list[dict[str, Any]]:
     parsed = []
     record: dict[str, Any] = {}
     for line in text.splitlines() + ["ER  - "]:
@@ -433,7 +409,6 @@ def _ris_records(text: str) -> OrderedDict[str, dict[str, Any]]:
             record["journal_abbreviation"] = value
         elif tag == "ER":
             if record:
-                record["ID"] = record.get("ID") or str(len(parsed) + 1)
                 parsed.append(record)
             record = {}
         elif tag == "ID":
@@ -465,7 +440,7 @@ def parse(
     *,
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
-) -> OrderedDict[str, dict[str, Any]]:
+) -> list[dict[str, Any]]:
     fmt = normalize_format(format)
     try:
         if fmt == "json":
@@ -474,7 +449,6 @@ def parse(
             rows = list(csv.DictReader(StringIO(text)))
             return _records_from_loaded_list(
                 normalize_source_rows(rows),
-                generate_ids=True,
             )
         if fmt == "bib":
             return _bib_records(
@@ -495,7 +469,7 @@ def parse(
     raise UnsupportedFormatError(f"Reading {fmt} is unsupported")
 
 
-def _tagged_records(text: str, fmt: str) -> OrderedDict[str, dict[str, Any]]:
+def _tagged_records(text: str, fmt: str) -> list[dict[str, Any]]:
     parsed = []
     current: dict[str, Any] = {}
     for line in text.splitlines() + (["ER  -"] if fmt == "nbib" else [""]):
@@ -503,7 +477,6 @@ def _tagged_records(text: str, fmt: str) -> OrderedDict[str, dict[str, Any]]:
             match = re.match(r"^([A-Z0-9]{2,4})\s+-\s+(.*)$", line)
             if not line.strip() and current:
                 current.setdefault("ENTRYTYPE", "article")
-                current.setdefault("ID", str(len(parsed) + 1))
                 parsed.append(current)
                 current = {}
                 continue
@@ -514,7 +487,6 @@ def _tagged_records(text: str, fmt: str) -> OrderedDict[str, dict[str, Any]]:
                 if tag == "ER":
                     if current:
                         current.setdefault("ENTRYTYPE", "article")
-                        current.setdefault("ID", str(len(parsed) + 1))
                         parsed.append(current)
                         current = {}
                 elif tag == "PMID":
@@ -540,7 +512,6 @@ def _tagged_records(text: str, fmt: str) -> OrderedDict[str, dict[str, Any]]:
                 continue
             if not line.strip() and current:
                 current.setdefault("ENTRYTYPE", "article")
-                current.setdefault("ID", str(len(parsed) + 1))
                 parsed.append(current)
                 current = {}
                 continue
@@ -573,17 +544,15 @@ def _tagged_records(text: str, fmt: str) -> OrderedDict[str, dict[str, Any]]:
                     )
             elif not line.strip() and current:
                 current.setdefault("ENTRYTYPE", "article")
-                current.setdefault("ID", str(len(parsed) + 1))
                 parsed.append(current)
                 current = {}
     if fmt == "nbib" and current:
         current.setdefault("ENTRYTYPE", "article")
-        current.setdefault("ID", str(len(parsed) + 1))
         parsed.append(current)
     if text.strip() and not parsed:
         raise ParseError(f"No {fmt.upper()} records found")
     normalized = [normalize_source_record(row, format=fmt) for row in parsed]
-    return _records_from_loaded_list(normalized, generate_ids=(fmt == "nbib"))
+    return _records_from_loaded_list(normalized)
 
 
 def _bib_escape(value: Any) -> str:

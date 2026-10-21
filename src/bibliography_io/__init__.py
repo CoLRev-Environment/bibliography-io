@@ -88,7 +88,9 @@ def _markdown_backend(text: str, source: str | Path) -> Any:
                 if hasattr(backend, "loads")
                 else backend(text, source=source)
             )
-            return normalize_records(result)
+            if isinstance(result, dict):
+                result = list(result.values())
+            return _records_from_loaded_list(result)
         except OptionalBackendUnavailableError:
             raise
         except Exception as exc:
@@ -107,8 +109,8 @@ def loads(
     format: str,
     mapping_fields: Any = (),
     list_fields: Any = (),
-) -> dict[str, dict[str, Any]]:
-    """Parse records from text.
+) -> list[dict[str, Any]]:
+    """Parse raw records from text, preserving order and source IDs.
 
     For BibTeX, ``mapping_fields`` and ``list_fields`` declare field names whose
     values use bibliography-io's versioned structured-value encoding. Supplying
@@ -130,8 +132,8 @@ def load_records(
     format: str | None = None,
     mapping_fields: Any = (),
     list_fields: Any = (),
-) -> dict[str, dict[str, Any]]:
-    """Load records from a UTF-8 file; infer its format from the suffix by default.
+) -> list[dict[str, Any]]:
+    """Load raw records as an ordered list; infer format from the suffix by default.
 
     A missing path raises :class:`FileNotFoundError`. For BibTeX, callers may
     declare structured fields with ``mapping_fields`` and ``list_fields``;
@@ -148,14 +150,7 @@ def load_records(
         try:
             rows = pd.read_excel(source).fillna("").to_dict(orient="records")
             return _records_from_loaded_list(
-                [
-                    normalize_source_record(
-                        {**row, "id": row.get("id", row.get("ID"))}, format=fmt
-                    )
-                    for row in rows
-                ],
-                allow_duplicate_ids=True,
-                generate_ids=True,
+                [normalize_source_record(row, format=fmt) for row in rows]
             )
         except Exception as exc:
             raise ParseError(f"Could not parse {fmt} file {source}: {exc}") from exc

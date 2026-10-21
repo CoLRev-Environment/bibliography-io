@@ -14,9 +14,8 @@ def test_load_xlsx_fixture() -> None:
     records = load_records(ORIGINAL_DUPLICATE_FIXTURE)
     expected = load_records(DATA / "load_expected.bib")
     assert len(records) == len(expected) == 3
-    assert list(records) == ["1", "2", "3"]
-    assert all(r["title"] == "Paper title" for r in records.values())
-    assert [r["type"] for r in records.values()] == [
+    assert all(r["title"] == "Paper title" for r in records)
+    assert [r["type"] for r in records] == [
         "article",
         "inproceedings",
         "techreport",
@@ -31,6 +30,5 @@ def test_xlsx_load_write_round_trip(tmp_path: Path) -> None:
     output = tmp_path / "roundtrip.xlsx"
     write_records(records, path=output)
     reloaded = load_records(output)
-    assert list(reloaded) == ["1", "2"]
-    assert [row["title"] for row in reloaded.values()] == ["One", "Two"]
-    assert [row["id"] for row in reloaded.values()] == ["one", "two"]
+    assert [row["title"] for row in reloaded] == ["One", "Two"]
+    assert [row["ID"] for row in reloaded] == ["one", "two"]

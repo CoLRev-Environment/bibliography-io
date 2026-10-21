@@ -13,10 +13,12 @@ DATA = Path(__file__).parent / "data" / "nbib"
 def test_load_nbib_fixture() -> None:
     records = load_records(DATA / "load.nbib")
     expected = load_records(DATA / "load_expected.bib")
-    record = next(iter(records.values()))
-    expected_record = next(iter(expected.values()))
-    assert record == expected_record
-    assert record["ID"] == "1"
+    record = next(iter(records))
+    expected_record = next(iter(expected))
+    assert record.get("ID") is None
+    for field, value in expected_record.items():
+        if field != "ID":
+            assert record[field] == value
     assert record["pmid"] == "12345678"
 
 

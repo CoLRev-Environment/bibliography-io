@@ -20,5 +20,5 @@ def test_generic_package_constants() -> None:
 
 def test_bibtex_metadata_remains_payload_data() -> None:
     records = bibio.loads("@article{sample, colrev_status={md_imported}}", format="bib")
-    assert records["sample"][Fields.STATUS] == "md_imported"
-    assert isinstance(records["sample"][Fields.STATUS], str)
+    assert records[0][Fields.STATUS] == "md_imported"
+    assert isinstance(records[0][Fields.STATUS], str)

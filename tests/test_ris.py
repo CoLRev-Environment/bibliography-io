@@ -16,9 +16,8 @@ def test_load_ris_fixtures() -> None:
     expected = load_records(DATA / "load_expected.bib")
     numbered_records = load_records(DATA / "nestedknowledge_numbered_records.ris")
 
-    assert list(records) == list(expected)
-    record = records["1"]
-    expected_record = expected["1"]
+    record = records[0]
+    expected_record = expected[0]
     assert record["ID"] == expected_record["ID"]
     assert record["ENTRYTYPE"] == expected_record["ENTRYTYPE"]
     for field in ("title", "author", "doi", "number", "issn", "pages"):
@@ -41,12 +40,12 @@ def test_load_ris_fixtures() -> None:
     )
     assert len(numbered_records) == 3
     assert "Activation of peroxisome-proliferator-receptor alpha" in str(
-        numbered_records["1"]["title"]
+        numbered_records[0]["title"]
     )
-    assert numbered_records["3"]["author"].startswith("M., Aban")
-    assert numbered_records["1"]["year"] == ["2011-01-01", "2011", "2011"]
-    assert numbered_records["1"]["doi"] == "10.1258/ebm.2010.011f01"
-    assert numbered_records["3"]["abstract"].startswith("PURPOSE:")
+    assert numbered_records[2]["author"].startswith("M., Aban")
+    assert numbered_records[0]["year"] == ["2011-01-01", "2011", "2011"]
+    assert numbered_records[0]["doi"] == "10.1258/ebm.2010.011f01"
+    assert numbered_records[2]["abstract"].startswith("PURPOSE:")
 
 
 def test_ris_load_write_round_trip(tmp_path: Path) -> None:

@@ -22,13 +22,16 @@ def test_loading_preserves_duplicate_record_ids() -> None:
     records = load_records(ORIGINAL_DUPLICATE_FIXTURE)
     repeated = [
         record
-        for record in records.values()
+        for record in records
         if record["ID"] == "articlewriter_firstrandomword_2020"
     ]
 
     assert len(repeated) == 2
-    assert len(set(records)) == len(records)
-    assert {record["doi"] for record in repeated} == {"10.3333/XYZ.V4444.04a"}
+    assert len(records) == 6
+    assert {record["doi"] for record in repeated} == {
+        "10.3333/XYZ.V4444.04",
+        "10.3333/XYZ.V4444.04a",
+    }
 
 
 def test_loading_matches_expected_bibtex() -> None:
@@ -36,11 +39,12 @@ def test_loading_matches_expected_bibtex() -> None:
     expected = load_records(DATA / "load_expected.bib")
 
     assert len(records) == len(expected)
-    assert list(records) == list(expected)
-    for record, expected_record in zip(records.values(), expected.values()):
+    for record, expected_record in zip(records, expected):
         assert record["ENTRYTYPE"] == expected_record["ENTRYTYPE"]
-        assert record["ID"] == expected_record["ID"]
+        assert record["ID"].split("#", 1)[0] == expected_record["ID"].split("#", 1)[0]
         for key, expected_value in expected_record.items():
+            if key == "ID":
+                continue
             actual_value = record[key]
             if isinstance(actual_value, str) and isinstance(expected_value, str):
                 assert " ".join(actual_value.split()) == " ".join(
@@ -89,7 +93,7 @@ def test_declared_nested_mapping_round_trip() -> None:
         mapping_fields=["colrev_masterdata_provenance"],
     )
 
-    assert parsed["example"]["colrev_masterdata_provenance"] == provenance
+    assert parsed[0]["colrev_masterdata_provenance"] == provenance
     assert "bibio-json-v1:" in encoded
 
 
@@ -99,9 +103,7 @@ def test_declared_nested_lists_round_trip() -> None:
     encoded = dumps(records, format="bib", list_fields=["custom_list"])
 
     assert (
-        loads(encoded, format="bib", list_fields=["custom_list"])["example"][
-            "custom_list"
-        ]
+        loads(encoded, format="bib", list_fields=["custom_list"])[0]["custom_list"]
         == value
     )
 
@@ -117,7 +119,7 @@ def test_empty_and_nested_empty_structures_round_trip(value: object) -> None:
     records = {"example": {"ENTRYTYPE": "misc", field: value}}
     encoded = dumps(records, format="bib", **declaration)
 
-    assert loads(encoded, format="bib", **declaration)["example"][field] == value
+    assert loads(encoded, format="bib", **declaration)[0][field] == value
 
 
 def test_structured_values_escape_arbitrary_text_and_preserve_scalar_types() -> None:
@@ -135,9 +137,7 @@ def test_structured_values_escape_arbitrary_text_and_preserve_scalar_types() -> 
     records = {"example": {"ENTRYTYPE": "misc", "data": value}}
     text = dumps(records, format="bib", mapping_fields=["data"])
 
-    assert (
-        loads(text, format="bib", mapping_fields=["data"])["example"]["data"] == value
-    )
+    assert loads(text, format="bib", mapping_fields=["data"])[0]["data"] == value
 
 
 def test_undeclared_structures_keep_serialization_error() -> None:
@@ -195,7 +195,14 @@ def test_structured_file_api_round_trip(tmp_path: Path) -> None:
 
     write_records(records, path=path, mapping_fields=["provenance"])
 
-    assert (
-        load_records(path, mapping_fields=["provenance"])["example"]["provenance"]
-        == value
+    assert load_records(path, mapping_fields=["provenance"])[0]["provenance"] == value
+
+
+def test_raw_bibtex_preserves_missing_duplicate_and_hash_ids() -> None:
+    records = loads(
+        "@article{same#key, title={First}}\n@article{same#key, title={Second}}",
+        format="bib",
     )
+    assert [record.get("ID") for record in records] == ["same#key", "same#key"]
+    assert [record["title"] for record in records] == ["First", "Second"]
+    assert loads('[{"title": "No ID"}]', format="json")[0].get("ID") is None

@@ -23,7 +23,7 @@ import sys
 sys.path.insert(0, sys.argv[1])
 import bibliography_io
 records = bibliography_io.loads("@article{sample, title={Standalone}}", format="bib")
-assert records["sample"]["title"] == "Standalone"
+assert records[0]["title"] == "Standalone"
 """
     subprocess.run(
         [sys.executable, "-S", "-c", script, str(source_path)],
@@ -46,7 +46,7 @@ def test_file_api_round_trip(tmp_path: Path) -> None:
     }
     source = tmp_path / "input.bib"
     write_records(records, path=source)
-    assert load_records(source) == records
+    assert load_records(source) == list(records.values())
 
 
 def test_write_records_requires_keyword_path(tmp_path: Path) -> None:
@@ -76,8 +76,8 @@ def test_bibtex_and_ris_round_trip(tmp_path: Path) -> None:
     ris_path = tmp_path / "roundtrip.ris"
     write_records(records, path=ris_path)
     ris_records = load_records(ris_path)
-    ris_record = next(iter(ris_records.values()))
-    source_record = next(iter(records.values()))
+    ris_record = next(iter(ris_records))
+    source_record = next(iter(records))
     assert ris_record["title"] == source_record["title"]
     assert ris_record["author"] == source_record["author"]
     assert ris_record["doi"] == source_record["doi"]

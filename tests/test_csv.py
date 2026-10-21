@@ -15,15 +15,15 @@ def test_load_csv_fixture() -> None:
     records = load_records(DATA / "load.csv")
     expected = load_records(DATA / "load_expected.bib")
     assert len(records) == len(expected) == 2
-    assert list(records) == ["1", "2"]
-    assert [record["pmid"] for record in records.values()] == ["11223344", "11223345"]
-    assert [record["title"] for record in records.values()] == [
+    assert [record.get("ID") for record in records] == [None, None]
+    assert [record["pmid"] for record in records] == ["11223344", "11223345"]
+    assert [record["title"] for record in records] == [
         "Paper title",
         "Paper title",
     ]
-    assert [record["journal"] for record in records.values()] == ["MISQ", ""]
-    assert records["1"]["container_title"] == "Nature"
-    assert records["2"]["booktitle"] == ["Nature", "ICIS"]
+    assert [record["journal"] for record in records] == ["MISQ", ""]
+    assert records[0]["container_title"] == "Nature"
+    assert records[1]["booktitle"] == ["Nature", "ICIS"]
 
 
 def test_csv_load_write_round_trip(tmp_path: Path) -> None:
@@ -45,6 +45,6 @@ def test_csv_fixture_writes_and_reloads(tmp_path: Path) -> None:
     write_records(records, path=output)
     written = load_records(output)
     assert len(written) == len(records)
-    for before, after in zip(records.values(), written.values()):
+    for before, after in zip(records, written):
         for field in ("pmid", "title", "author", "year", "doi", "pmcid"):
             assert before.get(field) == after.get(field)
