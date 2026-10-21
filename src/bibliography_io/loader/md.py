@@ -7,19 +7,19 @@ import logging
 import typing
 from pathlib import Path
 
-import requests
-
 import colrev.env.grobid_service
 import colrev.loader.load_utils
-import colrev.loader.loader
+import requests
+
 from bibliography_io.constants import Fields
+from bibliography_io.loader.loader import Loader
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=duplicate-code
 # pylint: disable=too-many-arguments
 
 
-class MarkdownLoader(colrev.loader.loader.Loader):
+class MarkdownLoader(Loader):
     """Loads reference strings from text (md) files (based on GROBID)."""
 
     def __init__(
@@ -31,7 +31,6 @@ class MarkdownLoader(colrev.loader.loader.Loader):
         id_labeler: typing.Callable = lambda x: x,
         unique_id_field: str = "",
         logger: logging.Logger = logging.getLogger(__name__),
-        format_names: bool = False,
     ):
         """Initialize the markdown loader."""
         super().__init__(
@@ -41,7 +40,6 @@ class MarkdownLoader(colrev.loader.loader.Loader):
             entrytype_setter=entrytype_setter,
             field_mapper=field_mapper,
             logger=logger,
-            format_names=format_names,
         )
 
     @classmethod

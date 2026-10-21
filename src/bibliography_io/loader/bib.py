@@ -11,9 +11,9 @@ import string
 import typing
 from pathlib import Path
 
-import colrev.loader.loader
 from bibliography_io.constants import Fields
 from bibliography_io.exceptions import UnsupportedFormatError
+from bibliography_io.loader.loader import Loader
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=too-many-arguments
@@ -325,7 +325,7 @@ def run_resolve_crossref(records: dict, *, logger: logging.Logger) -> None:
         del records[crossref_id]
 
 
-class BIBLoader(colrev.loader.loader.Loader):
+class BIBLoader(Loader):
     """Loads BibTeX files."""
 
     # pylint: disable=too-many-arguments
@@ -338,7 +338,6 @@ class BIBLoader(colrev.loader.loader.Loader):
         field_mapper: typing.Callable = lambda x: x,
         id_labeler: typing.Callable = lambda x: x,
         logger: logging.Logger = logging.getLogger(__name__),
-        format_names: bool = False,
         resolve_crossref: bool = False,
     ):
         """Initialize the instance."""
@@ -351,7 +350,6 @@ class BIBLoader(colrev.loader.loader.Loader):
             entrytype_setter=entrytype_setter,
             field_mapper=field_mapper,
             logger=logger,
-            format_names=format_names,
         )
 
     @classmethod

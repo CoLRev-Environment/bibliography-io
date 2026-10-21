@@ -252,7 +252,6 @@ def load(path: str | Path | None = None, **kwargs: Any) -> dict:
         "unique_id_field",
         "logger",
         "empty_if_file_not_exists",
-        "format_names",
     }:
         try:
             return importlib.import_module(".loader.load_utils", __name__).load(

@@ -8,14 +8,14 @@ import logging
 import typing
 from pathlib import Path
 
-import colrev.loader.loader
+from bibliography_io.loader.loader import Loader
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=too-many-arguments
 # pylint: disable=too-many-instance-attributes
 
 
-class JSONLoader(colrev.loader.loader.Loader):
+class JSONLoader(Loader):
     """Loads json files."""
 
     # pylint: disable=too-many-arguments
@@ -28,7 +28,6 @@ class JSONLoader(colrev.loader.loader.Loader):
         id_labeler: typing.Callable = lambda x: x,
         unique_id_field: str = "",
         logger: logging.Logger = logging.getLogger(__name__),
-        format_names: bool = False,
     ):
         """Initialize the instance."""
         super().__init__(
@@ -38,7 +37,6 @@ class JSONLoader(colrev.loader.loader.Loader):
             entrytype_setter=entrytype_setter,
             field_mapper=field_mapper,
             logger=logger,
-            format_names=format_names,
         )
 
     @classmethod

@@ -179,7 +179,6 @@ def load(  # type: ignore
     unique_id_field: str = "",
     logger: logging.Logger = logging.getLogger(__name__),
     empty_if_file_not_exists: bool = True,
-    format_names: bool = False,
 ) -> dict:
     """Load a file and return records as a dictionary."""
     if isinstance(filename, str):
@@ -228,7 +227,6 @@ def load(  # type: ignore
         id_labeler=id_labeler,
         unique_id_field=unique_id_field,
         logger=logger,
-        format_names=format_names,
     ).load()
 
 

@@ -9,14 +9,14 @@ from pathlib import Path
 
 import pandas as pd
 
-import colrev.loader.loader
 from bibliography_io.exceptions import ParseError
+from bibliography_io.loader.loader import Loader
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=too-many-arguments
 
 
-class TableLoader(colrev.loader.loader.Loader):
+class TableLoader(Loader):
     """Loads csv and Excel files (based on pandas)."""
 
     def __init__(
@@ -28,7 +28,6 @@ class TableLoader(colrev.loader.loader.Loader):
         id_labeler: typing.Callable = lambda x: x,
         unique_id_field: str = "",
         logger: logging.Logger = logging.getLogger(__name__),
-        format_names: bool = False,
     ):
         """Initialize the instance."""
         super().__init__(
@@ -38,7 +37,6 @@ class TableLoader(colrev.loader.loader.Loader):
             entrytype_setter=entrytype_setter,
             field_mapper=field_mapper,
             logger=logger,
-            format_names=format_names,
         )
 
     @classmethod

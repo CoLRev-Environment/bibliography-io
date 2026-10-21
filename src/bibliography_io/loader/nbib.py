@@ -8,7 +8,7 @@ import re
 import typing
 from pathlib import Path
 
-import colrev.loader.loader
+from bibliography_io.loader.loader import Loader
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=too-many-arguments
@@ -23,7 +23,7 @@ class ParseError(Exception):
     """Parsing error."""
 
 
-class NBIBLoader(colrev.loader.loader.Loader):
+class NBIBLoader(Loader):
     """Loads nbib files."""
 
     PATTERN = r"^[A-Z]{2,4}( ){1,2}- "
@@ -38,7 +38,6 @@ class NBIBLoader(colrev.loader.loader.Loader):
         id_labeler: typing.Callable = lambda x: x,
         unique_id_field: str = "",
         logger: logging.Logger = logging.getLogger(__name__),
-        format_names: bool = False,
     ):
         """Initialize the instance."""
         super().__init__(
@@ -48,7 +47,6 @@ class NBIBLoader(colrev.loader.loader.Loader):
             entrytype_setter=entrytype_setter,
             field_mapper=field_mapper,
             logger=logger,
-            format_names=format_names,
         )
 
         self.current: dict = {}

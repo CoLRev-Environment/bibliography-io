@@ -8,9 +8,8 @@ import re
 import typing
 from pathlib import Path
 
-import colrev.loader.loader
-from bibliography_io.constants import ENTRYTYPES
-from bibliography_io.constants import Fields
+from bibliography_io.constants import ENTRYTYPES, Fields
+from bibliography_io.loader.loader import Loader
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=too-many-arguments
@@ -118,7 +117,7 @@ def map_fields(record_dict: dict) -> None:
         record_dict.pop(control_field, None)
 
 
-class RISLoader(colrev.loader.loader.Loader):
+class RISLoader(Loader):
     """Loads ris files."""
 
     PATTERN = r"^[A-Z0-9]{2,4} "
@@ -134,7 +133,6 @@ class RISLoader(colrev.loader.loader.Loader):
         id_labeler: typing.Callable = lambda x: x,
         unique_id_field: str = "",
         logger: logging.Logger = logging.getLogger(__name__),
-        format_names: bool = False,
     ):
         """Initialize the instance."""
         super().__init__(
@@ -144,7 +142,6 @@ class RISLoader(colrev.loader.loader.Loader):
             entrytype_setter=entrytype_setter,
             field_mapper=field_mapper,
             logger=logger,
-            format_names=format_names,
         )
 
         self.current: dict = {}

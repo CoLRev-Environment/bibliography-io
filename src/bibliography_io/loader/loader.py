@@ -52,8 +52,7 @@ class Loader:
         if not all(Fields.ID in record_dict for record_dict in records_list):
             raise ValueError(
                 f"{Colors.ORANGE}ID not set in all records. Pass unique_id_field="
-                '"INCREMENTAL" to colrev.loader.load_utils.load() to generate '
-                f"sequential IDs.{Colors.END}"
+                f'"INCREMENTAL" to generate sequential IDs.{Colors.END}'
             )
         unique_ids = {record_dict[Fields.ID] for record_dict in records_list}
         non_unique_ids = [
