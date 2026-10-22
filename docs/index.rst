@@ -13,9 +13,17 @@ Install the core package with:
 
    python -m pip install bibliography-io
 
-The optional ``colrev`` extra is for legacy compatibility modules, not the
-standalone core API. Markdown reference-list parsing is pending an optional
-backend; Markdown table writing is included in the core.
+Optional dependencies enable Markdown parsing and Excel file support:
+
+.. code-block:: console
+
+   python -m pip install "bibliography-io[markdown]"
+   python -m pip install "bibliography-io[excel]"
+   python -m pip install "bibliography-io[all]"  # both
+
+Markdown parsing uses CoLRev and GROBID and requires a running GROBID service.
+Excel loading and writing require the ``excel`` extra. Markdown table writing
+is included in the core package.
 
 Quick example
 -------------
@@ -45,3 +53,4 @@ See :doc:`usage` for supported formats and :doc:`api` for the public interface.
 
    usage
    api
+   development

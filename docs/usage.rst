@@ -42,14 +42,16 @@ format; ``loads`` supports the text-based input formats.
 Format aliases include ``bibtex`` for BibTeX, ``excel`` for Excel, ``endnote``
 for ENL, and ``markdown`` for Markdown. File suffixes are case-insensitive.
 
-Markdown forms and optional backend
------------------------------------
+Markdown forms and optional dependencies
+-----------------------------------------
 
 Markdown table output is core functionality and does not need an optional
-backend. Markdown reference-list parsing is a distinct feature. Its backend
-and installation extra are still pending; until finalized, a Markdown read
-without a registered ``bibliography_io.backends`` entry point named
-``markdown`` raises ``OptionalBackendUnavailableError``.
+backend. Markdown reference-list parsing uses CoLRev and GROBID and is enabled
+by installing ``bibliography-io[markdown]``. A running GROBID service is also
+required. Without the extra, a Markdown read raises
+``OptionalBackendUnavailableError``. Excel loading and writing require
+``bibliography-io[excel]``; the ``all`` extra installs both optional feature
+sets.
 
 Record shape
 ------------

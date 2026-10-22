@@ -6,8 +6,8 @@ version and package name with the maintainers before publishing.
 ## Required pre-release checks
 
 1. Ensure the CI test job passes for the supported Python versions. It installs
-   `bibliography-io` and its test extra without CoLRev or GROBID, then runs the
-   complete standalone test suite:
+   `bibliography-io` and its test extra without optional integration packages,
+   then runs the complete standalone test suite:
 
    ```shell
    python -m pip install -e ".[test]"
@@ -15,7 +15,7 @@ version and package name with the maintainers before publishing.
    ```
 
    The test suite exercises the public bibliography-io API and repository data
-   fixtures without importing CoLRev.
+   fixtures without importing optional integration packages.
 2. Build and validate the release artifacts, then install the wheel into a clean
    environment without optional extras:
 
@@ -29,10 +29,10 @@ version and package name with the maintainers before publishing.
 
    From outside the source checkout, smoke-test imports and a BibTeX file
    round-trip with the installed wheel. The wheel test must not install the
-   `colrev`, `requests`, or Markdown backend extras.
-3. Markdown table output is part of core testing. Markdown reference-list
-   parsing is pending an optional backend; test it separately after the backend
-   package, entry-point protocol, and installation extra are finalized.
+   optional extras.
+3. Markdown table output is part of core testing. Test Markdown reference-list
+   parsing with the ``markdown`` extra and Excel load/write with the ``excel``
+   extra. The installed-wheel smoke test should continue to run without extras.
 4. Update `project.version` in `pyproject.toml`, add release notes, and keep the
    version in the Git tag synchronized with package metadata.
 

@@ -23,9 +23,16 @@ Install the base package with:
 pip install bibliography-io
 ```
 
-The optional `colrev` extra is for legacy compatibility modules. It is not
-needed by the core file and string APIs. Markdown reference-list parsing has no
-released optional backend yet.
+Install optional features as needed:
+
+```shell
+pip install "bibliography-io[markdown]"  # Markdown parsing through CoLRev/GROBID
+pip install "bibliography-io[excel]"     # Excel file support
+pip install "bibliography-io[all]"       # Both optional features
+```
+
+Markdown reference-list parsing also requires a running GROBID service. Core
+formats do not require either extra.
 
 ## Usage
 
@@ -70,25 +77,8 @@ for installation details, usage examples, and the generated API reference.
 
 ## Development
 
-Install the package's test extra and run the standalone test suite. The tests
-use the package API and do not require CoLRev:
-
-```shell
-pip install -e ".[test]"
-pip install build pre-commit
-pre-commit install
-pre-commit run --all-files
-pytest
-```
-
-Build the documentation locally with:
-
-```shell
-pip install -e ".[docs]"
-python -m sphinx -W --keep-going -b html docs docs/_build/html
-```
-
-See [RELEASING.md](RELEASING.md) for the package build and publication process.
+See the [development documentation](https://colrev-environment.github.io/bibliography-io/development.html)
+for test, lint, and documentation build instructions.
 
 ## Related Python BibTeX Libraries
 

@@ -36,6 +36,31 @@ assert records[0]["title"] == "Standalone"
     )
 
 
+def test_excel_write_reports_missing_optional_extra() -> None:
+    source_path = Path(__file__).parents[1] / "src"
+    script = """
+import sys, tempfile
+sys.path.insert(0, sys.argv[1])
+from pathlib import Path
+from bibliography_io import write_records
+from bibliography_io.exceptions import OptionalBackendUnavailableError
+with tempfile.TemporaryDirectory() as directory:
+    try:
+        write_records({"one": {"ID": "one", "ENTRYTYPE": "article"}},
+                      path=Path(directory) / "out.xlsx")
+    except OptionalBackendUnavailableError as exc:
+        assert "[excel]" in str(exc)
+    else:
+        raise AssertionError("Excel extra should be required")
+"""
+    subprocess.run(
+        [sys.executable, "-S", "-c", script, str(source_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
 def test_file_api_round_trip(tmp_path: Path) -> None:
     records = {
         "example2024": {
@@ -80,9 +105,11 @@ def test_deprecated_load_alias_delegates_to_core_api(tmp_path: Path) -> None:
 def test_deprecated_load_alias_rejects_legacy_colrev_options(
     tmp_path: Path,
 ) -> None:
-    with pytest.warns(DeprecationWarning):
-        with pytest.raises(TypeError, match="CoLRev-specific load options"):
-            load(tmp_path / "input.bib", entrytype_setter=lambda record: None)
+    with (
+        pytest.warns(DeprecationWarning),
+        pytest.raises(TypeError, match="CoLRev-specific load options"),
+    ):
+        load(tmp_path / "input.bib", entrytype_setter=lambda record: None)
 
 
 def test_bibtex_and_ris_round_trip(tmp_path: Path) -> None:

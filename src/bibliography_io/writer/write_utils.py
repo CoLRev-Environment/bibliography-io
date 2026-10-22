@@ -3,14 +3,14 @@
 
 Usage::
 
-    import colrev.loader.load_utils
-    import colrev.writer.write_utils
+    import bibliography_io.loader.load_utils
+    import bibliography_io.writer.write_utils
 
     # Load
-    records = colrev.loader.load_utils.load(filename=filename)
+    records = bibliography_io.loader.load_utils.load(filename=filename)
 
     # Write
-    colrev.writer.write_utils.write_file(records, filename=filename)
+    bibliography_io.writer.write_utils.write_file(records, filename=filename)
 
 """
 

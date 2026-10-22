@@ -23,7 +23,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: Text Processing",
 ]
-dependencies = ["pandas>=2.2,<3", "openpyxl>=3.1.2", "xlrd>=2.0.1"]
+dependencies = []
 
 [project.urls]
 Homepage = "https://github.com/CoLRev-Environment/bibliography-io"
@@ -33,12 +33,9 @@ Changelog = "https://github.com/CoLRev-Environment/bibliography-io/releases"
 Documentation = "https://colrev-environment.github.io/bibliography-io/"
 
 [project.optional-dependencies]
-# For legacy CoLRev-facing modules; the standalone core does not require it.
-colrev = ["colrev"]
-# Required by the historical Markdown/GROBID loader, not by core APIs.
-requests = ["requests>=2.31"]
-# Legacy convenience extra; the core API needs neither dependency.
-all = ["colrev", "requests>=2.31"]
+markdown = ["colrev"]
+excel = ["pandas>=2.2,<3", "openpyxl>=3.1.2", "xlrd>=2.0.1"]
+all = ["bibliography-io[markdown]", "bibliography-io[excel]"]
 test = ["pytest>=8.0"]
 docs = ["sphinx>=7.3,<9", "sphinx-rtd-theme>=3.0", "sphinx-copybutton>=0.5.2"]
 

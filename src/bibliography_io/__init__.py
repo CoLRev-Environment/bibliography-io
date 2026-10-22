@@ -96,10 +96,40 @@ def _markdown_backend(text: str, source: str | Path) -> Any:
             raise BackendExecutionError(
                 "Markdown backend failed to parse references"
             ) from exc
-    raise OptionalBackendUnavailableError(
-        "Markdown reference-list parsing is optional. Install a backend providing "
-        "the 'bibliography_io.backends' entry point named 'markdown'."
-    )
+    try:
+        from .markdown_backend import loads as markdown_loads
+
+        return _records_from_loaded_list(markdown_loads(text, source=source))
+    except OptionalBackendUnavailableError:
+        raise
+    except ImportError as exc:
+        raise OptionalBackendUnavailableError(
+            "Markdown reference-list parsing requires optional dependencies. "
+            "Install them with 'pip install bibliography-io[markdown]'."
+        ) from exc
+    except Exception as exc:
+        raise BackendExecutionError(
+            "Markdown GROBID backend failed to parse references"
+        ) from exc
+
+
+def _read_excel(source: Path, fmt: str) -> list[dict[str, Any]]:
+    try:
+        import pandas as pd
+
+        rows = pd.read_excel(source).fillna("").to_dict(orient="records")
+        return _records_from_loaded_list(
+            [normalize_source_record(row, format=fmt) for row in rows]
+        )
+    except ImportError as exc:
+        raise OptionalBackendUnavailableError(
+            f"Reading {fmt} files requires Excel dependencies. Install them with "
+            "'pip install bibliography-io[excel]'."
+        ) from exc
+    except OptionalBackendUnavailableError:
+        raise
+    except Exception as exc:
+        raise ParseError(f"Could not parse {fmt} file {source}: {exc}") from exc
 
 
 def loads(
@@ -144,15 +174,7 @@ def load_records(
     if not source.is_file():
         raise FileNotFoundError(source)
     if fmt in {"xls", "xlsx"}:
-        import pandas as pd
-
-        try:
-            rows = pd.read_excel(source).fillna("").to_dict(orient="records")
-            return _records_from_loaded_list(
-                [normalize_source_record(row, format=fmt) for row in rows]
-            )
-        except Exception as exc:
-            raise ParseError(f"Could not parse {fmt} file {source}: {exc}") from exc
+        return _read_excel(source, fmt)
     text = source.read_text(encoding="utf-8-sig")
     if fmt == "md":
         return _markdown_backend(text, source)
@@ -201,9 +223,15 @@ def write_records(
     mappings, lists = _structured_fields(fmt, mapping_fields, list_fields)
     normalized = normalize_records(records)
     if fmt == "xlsx":
-        import pandas as pd
+        try:
+            import pandas as pd
 
-        pd.DataFrame(normalized.values()).to_excel(destination, index=False)
+            pd.DataFrame(normalized.values()).to_excel(destination, index=False)
+        except ImportError as exc:
+            raise OptionalBackendUnavailableError(
+                "Writing Excel files requires Excel dependencies. Install them with "
+                "'pip install bibliography-io[excel]'."
+            ) from exc
         return
     if fmt == "md":
         output = _markdown_table(normalized)
