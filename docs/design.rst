@@ -35,9 +35,9 @@ ways those formats are used are not always under strict control. The raw data
 API is designed to be robust to that variation across supported formats and to
 write output that different consumers can import.
 
-Its loading interfaces return ordered lists. The API is expected to grow
-optional source tags through a future extension; the anticipated interfaces
-are:
+Its loading interfaces return ordered lists. Source-specific packages extend
+bibliography-io as plugins, and the loading interfaces accept optional source
+tags:
 
 .. code-block:: python
 
@@ -77,28 +77,22 @@ The raw API follows these principles:
   destination format cannot represent a field or value, writing raises
   ``SerializationError``.
 - By default, field names use the standardization currently built into
-  bibliography-io. In the anticipated extension, a source plugin may provide
-  source- and version-specific field-name mappings and source-specific
-  preprocessing. Its field-name mappings extend the built-in standardization
-  and take precedence for matching source fields. Field-name mappings must be
-  separate from other preprocessing: ``standardize_field_names=False`` disables
-  both built-in and plugin-provided field-name standardization, while other
-  source-specific preprocessing may still run without changing field names.
-  Without a source plugin, ambiguous conversions or decisions specific to a
-  format belong to format-specific or downstream packages.
-- In an anticipated extension, ``source`` and ``source_version`` are optional tags
-  that identify the system or provider that produced the data and, when
-  relevant, its export version. They are distinct from ``format``: for example,
-  ``format="xml"`` describes the serialization, while
-  ``source="web_of_science"`` identifies its origin (formats like ``xml`` may be provided by different sources with different syntax). ``source_version`` is a
-  label for version-specific loading or export behavior.
-- In the anticipated extension, source-specific parsing and writing behavior
-  will be provided by separately installable Python packages registered through
-  the plugin infrastructure. When a source is specified, the matching plugin
-  may handle that source's format and version. With no source specified, the
-  core format handler is used. A requested source plugin that is unavailable
-  raises ``OptionalBackendUnavailableError``; an unsupported
-  source/format/version combination raises ``UnsupportedFormatError``.
+  bibliography-io. A source-specific package may provide source- and
+  version-specific field-name mappings or preprocessing as a plugin; see
+  :ref:`source-specific-parsing` for the plugin loading design. Without a
+  source plugin, ambiguous conversions or decisions specific to a format
+  belong to format-specific or downstream packages.
+- The optional ``source`` and ``source_version`` tags identify the system or
+  provider that produced the data and, when relevant, its export version. They
+  are distinct from ``format``: for example, ``format="xml"`` describes the
+  serialization, while ``source="web_of_science"`` identifies its origin
+  (formats like ``xml`` may be provided by different sources with different
+  syntax). ``source_version`` is a label for version-specific loading or export
+  behavior.
+- Source-specific parsing and processing are provided by separately
+  installable packages that extend bibliography-io as plugins. The core format
+  parser remains the default when no source is specified; see
+  :ref:`source-specific-parsing` for the loading pipeline.
 - Metadata preparation (e.g., of author and language fields), and lookup
   searches are responsibilities of downstream packages.
 
@@ -107,7 +101,80 @@ functionality; Markdown reference-list parsing is an optional, lazily loaded
 backend. Format-specific options for raw loading and writing, including options
 for JSON and other core formats, belong to this API and must be documented with
 the relevant format. Core functions accept no undocumented options. Structured
-BibTeX field options for primary data are described in the next section.
+BibTeX field options for primary data are described in the Primary Data API
+section.
+
+.. _source-specific-parsing:
+
+Source-specific parsing
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Separately installable source-specific packages extend bibliography-io as
+plugins registered through the plugin infrastructure. The core owns and
+orchestrates loading; a source plugin supplies hooks that run at defined points
+in that pipeline. Conceptually, ``load_records()`` follows this sequence:
+
+.. code-block:: python
+
+   def load_records(path, *, format=None, source=None, source_version=None):
+       text, resolved_format = read_input(path, format=format)
+       plugin = get_source_plugin(source) if source else None
+
+       if plugin:
+           text = plugin.preprocess(
+               text, format=resolved_format,
+               source_version=source_version,
+           )
+
+       records = parse(text, format=resolved_format)
+       records = normalize_basic(records, plugin=plugin)
+
+       if plugin:
+           records = plugin.postprocess(
+               records, format=resolved_format,
+               source_version=source_version,
+           )
+
+       return validate_records(records)
+
+``read_input()`` resolves and reads the file, while ``parse()``,
+``normalize_basic()``, and ``validate_records()`` represent core stages. The
+plugin's ``preprocess()`` hook can adapt source-specific input text before
+parsing. ``postprocess()`` receives parsed, basically normalized records for
+source-specific transformations. The same stages apply to ``loads()`` after its
+input text and required format have been validated. With no source specified,
+the core uses its generic format handling and skips the plugin hooks.
+
+Source- and version-specific field-name mappings supplied by a plugin
+participate in ``normalize_basic()``: they extend built-in mappings and take
+precedence for matching source fields. They are separate from other plugin
+preprocessing and post-processing. Accordingly,
+``standardize_field_names=False`` disables both built-in and plugin-provided
+field-name standardization. Other source-specific preprocessing and
+post-processing may still run, but must not change field names when this option
+is false.
+
+Users may access a source through either the ``bibliography-io`` API or the
+source-specific package. The latter exposes a thin convenience facade that
+selects its source in the core API, for example:
+
+.. code-block:: python
+
+   # provider_x_bibliography/__init__.py
+   def load_records(path, *, format=None, source_version=None):
+       return bibliography_io.load_records(
+           path,
+           format=format,
+           source="provider_x",
+           source_version=source_version,
+       )
+
+Both entry points use the core's orchestrated pipeline. The plugin hook
+implementation must not call the source-dispatching ``load_records()`` with the
+same source, which would dispatch back to that plugin. With no source specified,
+the matching source plugin is not used. A requested source plugin that is
+unavailable raises ``OptionalBackendUnavailableError``; an unsupported
+source/format/version combination raises ``UnsupportedFormatError``.
 
 Primary Data API
 ----------------
