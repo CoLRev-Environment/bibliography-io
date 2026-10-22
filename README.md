@@ -84,6 +84,9 @@ for test, lint, and documentation build instructions.
 
 The following libraries support additional bibliographic formats, conversion workflows, and reference extraction:
 
+- [**BibtexParser**](https://github.com/sciunto-org/python-bibtexparser) — A lightweight, actively maintained library for reading, writing, and modifying `.bib` files. Supports customizable parsing, field transformations, and BibTeX serialization. Best suited for general-purpose BibTeX processing.
+- [**Pybtex**](https://pybtex.org/) — A bibliography processing library that supports BibTeX parsing, citation formatting, and conversion between bibliography formats. Provides extensible formatting styles and output formats such as LaTeX, HTML, and plain text. Best suited for generating formatted references.
+- [**biblib**](https://pypi.org/project/biblib/) — A library for managing bibliographic databases, including merging entries, accessing metadata, and retrieving references using DOI or ISBN identifiers. Useful for building custom bibliography management workflows, although its last PyPI release was in 2018.
 - [**rispy**](https://github.com/MrTango/rispy) — A lightweight Python library for reading and writing RIS files. Supports configurable tag mappings and custom parsers/writers. Best suited for standalone RIS processing.
 - [**pybtexris**](https://pypi.org/project/pybtexris/) — A Pybtex plugin for reading RIS files and converting them into formats such as BibTeX. Also supports bibliography formatting through Pybtex.
 - [**pybtexnbib**](https://pypi.org/project/pybtexnbib/) — A Pybtex plugin for parsing PubMed/MEDLINE (`.nbib`) files. Useful for integrating PubMed references into BibTeX and other bibliography workflows.
