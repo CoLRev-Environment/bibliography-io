@@ -1,5 +1,5 @@
-Standalone API and compatibility contract
-=========================================
+Design principles
+==================
 
 Purpose and scope
 -----------------
