@@ -80,15 +80,16 @@ for installation details, usage examples, and the generated API reference.
 See the [development documentation](https://colrev-environment.github.io/bibliography-io/development.html)
 for test, lint, and documentation build instructions.
 
-## Related Python BibTeX Libraries
+## Related Python Libraries
 
-The following Python libraries provide functionality for parsing and managing BibTeX files:
+The following libraries support additional bibliographic formats, conversion workflows, and reference extraction:
 
-- **[BibtexParser](https://github.com/sciunto-org/python-bibtexparser)** — A lightweight, actively maintained library for reading, writing, and modifying `.bib` files. Supports customizable parsing, field transformations, and BibTeX serialization. Best suited for general-purpose BibTeX processing.
-
-- **[Pybtex](https://pybtex.org/)** — A bibliography processing library that supports BibTeX parsing, citation formatting, and conversion between bibliography formats. Provides extensible formatting styles and output formats such as LaTeX, HTML, and plain text. Best suited for generating formatted references.
-
-- **[biblib](https://pypi.org/project/biblib/)** — A library for managing bibliographic databases, including merging entries, accessing metadata, and retrieving references using DOI or ISBN identifiers. Useful for building custom bibliography management workflows, although its last PyPI release was in 2018.
+- [**rispy**](https://github.com/MrTango/rispy) — A lightweight Python library for reading and writing RIS files. Supports configurable tag mappings and custom parsers/writers. Best suited for standalone RIS processing.
+- [**pybtexris**](https://pypi.org/project/pybtexris/) — A Pybtex plugin for reading RIS files and converting them into formats such as BibTeX. Also supports bibliography formatting through Pybtex.
+- [**pybtexnbib**](https://pypi.org/project/pybtexnbib/) — A Pybtex plugin for parsing PubMed/MEDLINE (`.nbib`) files. Useful for integrating PubMed references into BibTeX and other bibliography workflows.
+- [**endnote-utils**](https://pypi.org/project/endnote-utils/) — A utility for converting EndNote XML and RIS records to CSV, JSON, and Excel formats. Also provides command-line tools for bibliographic data processing.
+- [**Biopython (Bio.Medline)**](https://biopython.org/) — Provides parsers for MEDLINE-formatted records, including PubMed exports. Best suited for biomedical literature processing.
+- [**pubmed-parser**](https://github.com/titipata/pubmed_parser) — A Python library for extracting structured metadata from PubMed and PubMed Central XML datasets. Particularly useful for large-scale biomedical literature analysis.
 
 ## License
 
