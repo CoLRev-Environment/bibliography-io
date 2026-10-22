@@ -96,7 +96,7 @@ compact JSON encoded as UTF-8 and Base64 inside a standard BibTeX braced value.
 It preserves JSON strings, delimiters, braces, quotes, backslashes, Unicode,
 booleans, numbers, nulls, and empty/nested containers. Undeclared mappings and
 lists still raise ``SerializationError``. Structured-field options supplied to
-non-BibTeX formats raise ``UnsupportedFormatError``. See ``CONTRACT.md`` for the
+non-BibTeX formats raise ``UnsupportedFormatError``. See :doc:`design` for the
 full encoding and error contract.
 
 Compatibility aliases

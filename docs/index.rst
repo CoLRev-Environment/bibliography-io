@@ -45,7 +45,8 @@ an explicit format:
    records = loads("@article{example, title={An example}}", format="bib")
    bibtex = dumps(records, format="bib")
 
-See :doc:`usage` for supported formats and :doc:`api` for the public interface.
+See :doc:`usage` for supported formats, :doc:`api` for the public interface,
+and :doc:`design` for the standalone API and compatibility contract.
 
 .. toctree::
    :maxdepth: 2
@@ -53,4 +54,5 @@ See :doc:`usage` for supported formats and :doc:`api` for the public interface.
 
    usage
    api
+   design
    development
