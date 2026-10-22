@@ -2,7 +2,7 @@
 
 
 class Fields:
-    """Common bibliographic field names used by parsers and writers."""
+    """Common bibliographic field names used by loaders and writers."""
 
     ID = "ID"
     ENTRYTYPE = "ENTRYTYPE"

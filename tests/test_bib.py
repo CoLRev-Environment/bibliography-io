@@ -66,6 +66,34 @@ def test_unique_id_round_trip_uses_expected_fixtures(tmp_path: Path) -> None:
     assert load_records(output) == records
 
 
+def test_bibtex_writer_aligns_fields_per_entry() -> None:
+    records = {
+        "first": {
+            "ENTRYTYPE": "article",
+            "author": "Example, Alex",
+            "colrev_status": "md_prepared",
+            "ID": "first",
+        },
+        "second": {
+            "ENTRYTYPE": "misc",
+            "title": "Standalone",
+            "ID": "second",
+        },
+    }
+
+    text = dumps(records, format="bib")
+
+    assert text == (
+        "@article{first,\n"
+        "  author        = {Example, Alex},\n"
+        "  colrev_status = {md_prepared}\n"
+        "}\n\n"
+        "@misc{second,\n"
+        "  title = {Standalone}\n"
+        "}"
+    )
+
+
 def test_malformed_bibtex_raises_parse_error() -> None:
     with pytest.raises(ParseError):
         loads("not a BibTeX entry", format="bib")

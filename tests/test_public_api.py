@@ -39,7 +39,8 @@ assert records[0]["title"] == "Standalone"
 def test_excel_write_reports_missing_optional_extra() -> None:
     source_path = Path(__file__).parents[1] / "src"
     script = """
-import sys, tempfile
+import sys
+import tempfile
 sys.path.insert(0, sys.argv[1])
 from pathlib import Path
 from bibliography_io import write_records

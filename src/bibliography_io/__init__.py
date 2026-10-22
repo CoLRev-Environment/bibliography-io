@@ -3,16 +3,9 @@
 from __future__ import annotations
 
 import warnings
-from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any
 
-from .core import normalize_format
-from .core import _records_from_loaded_list
-from .core import normalize_source_record
-from .core import normalize_records
-from .core import parse
-from .core import serialize
 from .exceptions import BackendExecutionError
 from .exceptions import BibliographyIOError
 from .exceptions import DuplicateRecordIDError
@@ -22,6 +15,23 @@ from .exceptions import ParseError
 from .exceptions import RecordValidationError
 from .exceptions import SerializationError
 from .exceptions import UnsupportedFormatError
+from .normalization import normalize_format
+from .normalization import normalize_records
+
+
+def serialize(
+    records: Any,
+    format: str,
+    *,
+    mapping_fields: frozenset[str] = frozenset(),
+    list_fields: frozenset[str] = frozenset(),
+) -> str:
+    """Serialize records by dispatching to the format-specific writer."""
+    from .writers import serialize as dispatch
+
+    return dispatch(
+        records, format, mapping_fields=mapping_fields, list_fields=list_fields
+    )
 
 
 def _format_from_path(path: str | Path, format: str | None) -> str:
@@ -72,66 +82,6 @@ def _structured_fields(
     return mappings, lists
 
 
-def _markdown_backend(text: str, source: str | Path) -> Any:
-    points = entry_points()
-    matches = (
-        points.select(group="bibliography_io.backends", name="markdown")
-        if hasattr(points, "select")
-        else points.get("bibliography_io.backends", [])
-    )
-    for point in matches:
-        try:
-            backend = point.load()
-            result = (
-                backend.loads(text, source=source)
-                if hasattr(backend, "loads")
-                else backend(text, source=source)
-            )
-            if isinstance(result, dict):
-                result = list(result.values())
-            return _records_from_loaded_list(result)
-        except OptionalBackendUnavailableError:
-            raise
-        except Exception as exc:
-            raise BackendExecutionError(
-                "Markdown backend failed to parse references"
-            ) from exc
-    try:
-        from .markdown_backend import loads as markdown_loads
-
-        return _records_from_loaded_list(markdown_loads(text, source=source))
-    except OptionalBackendUnavailableError:
-        raise
-    except ImportError as exc:
-        raise OptionalBackendUnavailableError(
-            "Markdown reference-list parsing requires optional dependencies. "
-            "Install them with 'pip install bibliography-io[markdown]'."
-        ) from exc
-    except Exception as exc:
-        raise BackendExecutionError(
-            "Markdown GROBID backend failed to parse references"
-        ) from exc
-
-
-def _read_excel(source: Path, fmt: str) -> list[dict[str, Any]]:
-    try:
-        import pandas as pd
-
-        rows = pd.read_excel(source).fillna("").to_dict(orient="records")
-        return _records_from_loaded_list(
-            [normalize_source_record(row, format=fmt) for row in rows]
-        )
-    except ImportError as exc:
-        raise OptionalBackendUnavailableError(
-            f"Reading {fmt} files requires Excel dependencies. Install them with "
-            "'pip install bibliography-io[excel]'."
-        ) from exc
-    except OptionalBackendUnavailableError:
-        raise
-    except Exception as exc:
-        raise ParseError(f"Could not parse {fmt} file {source}: {exc}") from exc
-
-
 def loads(
     text: str,
     *,
@@ -139,7 +89,7 @@ def loads(
     mapping_fields: Any = (),
     list_fields: Any = (),
 ) -> list[dict[str, Any]]:
-    """Parse raw records from text, preserving order and source IDs.
+    """Load raw records from text, preserving order and source IDs.
 
     For BibTeX, ``mapping_fields`` and ``list_fields`` declare field names whose
     values use bibliography-io's versioned structured-value encoding. Supplying
@@ -150,9 +100,11 @@ def loads(
         raise TypeError("text must be str")
     fmt = normalize_format(format)
     mappings, lists = _structured_fields(fmt, mapping_fields, list_fields)
-    if fmt == "md":
-        return _markdown_backend(text, "<string>")
-    return parse(text, fmt, mapping_fields=mappings, list_fields=lists)
+    from .loaders import load_text
+
+    return load_text(
+        text, fmt, mapping_fields=mappings, list_fields=lists, source="<string>"
+    )
 
 
 def load_records(
@@ -174,11 +126,15 @@ def load_records(
     if not source.is_file():
         raise FileNotFoundError(source)
     if fmt in {"xls", "xlsx"}:
-        return _read_excel(source, fmt)
+        from .loaders.tabular import load_excel
+
+        return load_excel(source, fmt)
     text = source.read_text(encoding="utf-8-sig")
-    if fmt == "md":
-        return _markdown_backend(text, source)
-    return parse(text, fmt, mapping_fields=mappings, list_fields=lists)
+    from .loaders import load_text
+
+    return load_text(
+        text, fmt, mapping_fields=mappings, list_fields=lists, source=source
+    )
 
 
 def dumps(
@@ -335,6 +291,7 @@ def get_nr_records(filename: str | Path) -> int:
 
 
 __all__ = [
+    "BackendExecutionError",
     "BibliographyIOError",
     "DuplicateRecordIDError",
     "MissingRecordIDError",

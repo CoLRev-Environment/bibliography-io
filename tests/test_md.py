@@ -1,9 +1,7 @@
 """Tests for Markdown table output and optional reference-list parsing."""
 
 import builtins
-import sys
 from pathlib import Path
-from types import ModuleType
 
 import pytest
 
@@ -44,23 +42,34 @@ def _block_optional_markdown_dependencies(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(builtins, "__import__", optional_import)
 
 
-def test_markdown_backend_adapts_legacy_loader(monkeypatch: pytest.MonkeyPatch) -> None:
-    module = ModuleType("bibliography_io.loader.md")
+def test_markdown_loader_uses_registered_backend(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from bibliography_io import loads
+    from bibliography_io.loaders import markdown
 
-    class FakeMarkdownLoader:
-        def __init__(self, *, filename: Path, logger: object) -> None:
-            self.filename = filename
-
-        def load_records_list(self) -> list[dict[str, str]]:
-            assert self.filename.read_text(encoding="utf-8") == "A citation"
+    class FakeBackend:
+        @staticmethod
+        def loads(text: str, *, source: str) -> list[dict[str, str]]:
+            assert text == "A citation"
+            assert source == "<string>"
             return [{"ID": "1", "ENTRYTYPE": "article", "title": "Parsed"}]
 
-    module.MarkdownLoader = FakeMarkdownLoader  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "bibliography_io.loader.md", module)
+    class FakeEntryPoint:
+        @staticmethod
+        def load() -> type[FakeBackend]:
+            return FakeBackend
 
-    from bibliography_io.markdown_backend import loads
+    class FakeEntryPoints:
+        @staticmethod
+        def select(*, group: str, name: str) -> list[FakeEntryPoint]:
+            assert group == "bibliography_io.backends"
+            assert name == "markdown"
+            return [FakeEntryPoint()]
 
-    assert loads("A citation", source="<string>") == [
+    monkeypatch.setattr(markdown, "entry_points", FakeEntryPoints)
+
+    assert loads("A citation", format="md") == [
         {"ID": "1", "ENTRYTYPE": "article", "title": "Parsed"}
     ]
 
