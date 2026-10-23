@@ -19,15 +19,15 @@ from .normalization import normalize_format
 from .normalization import normalize_records
 
 
-def serialize(
+def write_string(
     records: Any,
     format: str,
     *,
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
 ) -> str:
-    """Serialize records by dispatching to the format-specific writer."""
-    from .writers import serialize as dispatch
+    """Write records to a formatted string using the format-specific writer."""
+    from .writers import write_string as dispatch
 
     return dispatch(
         records, format, mapping_fields=mapping_fields, list_fields=list_fields
@@ -46,12 +46,12 @@ def _format_from_path(path: str | Path, format: str | None) -> str:
 
 
 def _structured_fields(
-    fmt: str,
+    format: str,
     mapping_fields: Any,
     list_fields: Any,
 ) -> tuple[frozenset[str], frozenset[str]]:
     """Validate and normalize explicitly-declared structured field names."""
-    if fmt != "bib":
+    if format != "bib":
         try:
             has_fields = bool(mapping_fields) or bool(list_fields)
         except (TypeError, ValueError) as exc:
@@ -86,24 +86,33 @@ def loads(
     text: str,
     *,
     format: str,
+    normalize: bool = True,
     mapping_fields: Any = (),
     list_fields: Any = (),
 ) -> list[dict[str, Any]]:
-    """Load raw records from text, preserving order and source IDs.
+    """Load raw records from a string, preserving order and source IDs.
 
-    For BibTeX, ``mapping_fields`` and ``list_fields`` declare field names whose
-    values use bibliography-io's versioned structured-value encoding. Supplying
-    either option for other formats raises :class:`UnsupportedFormatError`.
-    Declared field names match the lowercased BibTeX names.
+    By default, returns normalized raw data for convenient access. Set
+    ``normalize=False`` to retain parser-level values for source-specific
+    processing. For BibTeX, ``mapping_fields`` and ``list_fields`` declare
+    fields whose values use bibliography-io's versioned structured-value
+    encoding. Supplying either option for other formats raises
+    :class:`UnsupportedFormatError`. Declared field names match the lowercased
+    BibTeX names.
     """
     if not isinstance(text, str):
-        raise TypeError("text must be str")
-    fmt = normalize_format(format)
-    mappings, lists = _structured_fields(fmt, mapping_fields, list_fields)
-    from .loaders import load_text
+        raise TypeError("input must be a string")
+    format_name = normalize_format(format)
+    mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
+    from .loaders import load_string
 
-    return load_text(
-        text, fmt, mapping_fields=mappings, list_fields=lists, source="<string>"
+    return load_string(
+        text,
+        format_name,
+        normalize=normalize,
+        mapping_fields=mappings,
+        list_fields=lists,
+        source="<string>",
     )
 
 
@@ -111,29 +120,43 @@ def load_records(
     path: str | Path,
     *,
     format: str | None = None,
+    normalize: bool = True,
     mapping_fields: Any = (),
     list_fields: Any = (),
 ) -> list[dict[str, Any]]:
     """Load raw records as an ordered list; infer format from the suffix by default.
 
+    By default, returns normalized raw data for convenient access. Set
+    ``normalize=False`` for parser-level values and source-specific processing.
     A missing path raises :class:`FileNotFoundError`. For BibTeX, callers may
     declare structured fields with ``mapping_fields`` and ``list_fields``;
     these options are unsupported for other formats.
     """
     source = Path(path)
-    fmt = _format_from_path(source, format)
-    mappings, lists = _structured_fields(fmt, mapping_fields, list_fields)
+    format_name = _format_from_path(source, format)
+    mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
     if not source.is_file():
         raise FileNotFoundError(source)
-    if fmt in {"xls", "xlsx"}:
+    if format_name in {"xls", "xlsx"}:
         from .loaders.tabular import load_excel
+        from .normalization import normalize_loaded_records
 
-        return load_excel(source, fmt)
-    text = source.read_text(encoding="utf-8-sig")
-    from .loaders import load_text
+        records = load_excel(source, format=format_name, normalize=normalize)
+        return (
+            normalize_loaded_records(records, list_fields=lists)
+            if normalize
+            else records
+        )
+    string = source.read_text(encoding="utf-8-sig")
+    from .loaders import load_string
 
-    return load_text(
-        text, fmt, mapping_fields=mappings, list_fields=lists, source=source
+    return load_string(
+        string,
+        format_name,
+        normalize=normalize,
+        mapping_fields=mappings,
+        list_fields=lists,
+        source=source,
     )
 
 
@@ -144,20 +167,22 @@ def dumps(
     mapping_fields: Any = (),
     list_fields: Any = (),
 ) -> str:
-    """Serialize records to text.
+    """Return records written as a formatted string.
 
     For BibTeX, ``mapping_fields`` and ``list_fields`` declare fields to encode
     as structured values. Supplying either option for other formats raises
     :class:`UnsupportedFormatError`. The declared names match the record field
     names (matching is case-insensitive, as BibTeX field names are).
     """
-    fmt = normalize_format(format)
-    mappings, lists = _structured_fields(fmt, mapping_fields, list_fields)
-    if fmt in {"xlsx", "xls"}:
+    format_name = normalize_format(format)
+    mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
+    if format_name in {"xlsx", "xls"}:
         raise UnsupportedFormatError(
-            "Excel is a file format and cannot be serialized to text"
+            "Excel is a file format and cannot be written as a string"
         )
-    return serialize(records, fmt, mapping_fields=mappings, list_fields=lists)
+    return write_string(
+        records, format_name, mapping_fields=mappings, list_fields=lists
+    )
 
 
 def write_records(
@@ -175,10 +200,10 @@ def write_records(
     :class:`UnsupportedFormatError`.
     """
     destination = Path(path)
-    fmt = _format_from_path(destination, format)
-    mappings, lists = _structured_fields(fmt, mapping_fields, list_fields)
+    format_name = _format_from_path(destination, format)
+    mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
     normalized = normalize_records(records)
-    if fmt == "xlsx":
+    if format_name == "xlsx":
         try:
             import pandas as pd
 
@@ -189,10 +214,12 @@ def write_records(
                 "'pip install bibliography-io[excel]'."
             ) from exc
         return
-    if fmt == "md":
+    if format_name == "md":
         output = _markdown_table(normalized)
     else:
-        output = serialize(normalized, fmt, mapping_fields=mappings, list_fields=lists)
+        output = write_string(
+            normalized, format_name, mapping_fields=mappings, list_fields=lists
+        )
     destination.write_text(output, encoding="utf-8")
 
 

@@ -26,7 +26,7 @@ class DuplicateRecordIDError(RecordValidationError):
 
 
 class SerializationError(BibliographyIOError, ValueError):
-    """Records cannot be represented in the requested output format."""
+    """Records cannot be written in the requested output format."""
 
 
 class OptionalBackendUnavailableError(BibliographyIOError, ImportError):

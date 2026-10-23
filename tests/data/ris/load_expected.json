@@ -1,0 +1,30 @@
+[
+  {
+    "ENTRYTYPE": "inproceedings",
+    "title": "Title of a conference paper",
+    "journal": "Secondary Title (booktitle title, if applicable)",
+    "pages": "183--186",
+    "author": "A. Author-One and B. Author-Two and C. Author-Three and D. Author-Four and E. Author-Five",
+    "keywords": "keyword2",
+    "year": "2020; 4-8 Aug. 2020",
+    "doi": "10.1234/Random-name55555.2020.00050",
+    "ID": "conference-2020",
+    "issn": "1111-3333",
+    "pubmed_id": "12345678"
+  },
+  {
+    "ENTRYTYPE": "article",
+    "pubmed_id": "12345678",
+    "ID": "1",
+    "title": "Title of a journal paper",
+    "journal": "Secondary Title (journal title, if applicable)",
+    "pages": "14--25",
+    "author": "A. Author-One and B. Author-Two and C. Author-Three",
+    "year": "2017; Mar. 2017",
+    "doi": "10.1111/MC.2017.66",
+    "number": "3",
+    "issn": "1111-2222",
+    "volume": "50",
+    "journal_abbreviation": "Secondary Title (journal title, if applicable)"
+  }
+]

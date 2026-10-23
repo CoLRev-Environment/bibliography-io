@@ -7,6 +7,7 @@ from typing import Any
 
 from ..exceptions import ParseError
 from ..normalization import _records_from_loaded_list
+from ..normalization import _records_from_un_normalized_list
 from ..normalization import normalize_field_name
 
 RIS_MAP = {
@@ -46,8 +47,8 @@ RIS_TYPE = {
 }
 
 
-def load_ris(text: str) -> list[dict[str, Any]]:
-    """Load RIS records and map RIS tags to bibliography fields."""
+def load_ris(text: str, *, normalize: bool = True) -> list[dict[str, Any]]:
+    """Load RIS records, optionally mapping tags to bibliography fields."""
     parsed = []
     record: dict[str, Any] = {}
     for line in text.splitlines() + ["ER  - "]:
@@ -56,6 +57,8 @@ def load_ris(text: str) -> list[dict[str, Any]]:
             continue
         tag, value = match.groups()
         if tag == "TY":
+            if record:
+                parsed.append(record)
             record = {"ENTRYTYPE": RIS_TYPE.get(value.upper(), "misc")}
         elif tag == "ER":
             if record:
@@ -64,7 +67,11 @@ def load_ris(text: str) -> list[dict[str, Any]]:
         elif tag == "ID":
             record["ID"] = value
         else:
-            key = normalize_field_name(tag, field_aliases=RIS_FIELD_ALIASES)
+            key = (
+                normalize_field_name(tag, field_aliases=RIS_FIELD_ALIASES)
+                if normalize
+                else tag
+            )
             if key in record:
                 record[key] = (
                     [*record[key], value]
@@ -73,12 +80,18 @@ def load_ris(text: str) -> list[dict[str, Any]]:
                 )
             else:
                 record[key] = value
-    for item in parsed:
-        start_page, end_page = item.pop("startpage", None), item.pop("endpage", None)
-        if start_page is not None:
-            item["pages"] = str(start_page) + (f"--{end_page}" if end_page else "")
-        if isinstance(item.get("author"), list):
-            item["author"] = " and ".join(item["author"])
+    if normalize:
+        for item in parsed:
+            start_page, end_page = (
+                item.pop("startpage", None),
+                item.pop("endpage", None),
+            )
+            if start_page is not None:
+                item["pages"] = str(start_page) + (f"--{end_page}" if end_page else "")
+            if isinstance(item.get("author"), list):
+                item["author"] = " and ".join(item["author"])
     if text.strip() and not parsed:
         raise ParseError("No RIS records found")
+    if not normalize:
+        return _records_from_un_normalized_list(parsed)
     return _records_from_loaded_list(parsed, field_aliases=RIS_FIELD_ALIASES)

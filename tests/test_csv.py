@@ -1,5 +1,6 @@
 """Tests for CSV file APIs using the retained CSV fixture."""
 
+import json
 from pathlib import Path
 
 from bibliography_io import dumps
@@ -13,17 +14,19 @@ DATA = Path(__file__).parent / "data" / "csv"
 
 def test_load_csv_fixture() -> None:
     records = load_records(DATA / "load.csv")
-    expected = load_records(DATA / "load_expected.bib")
+    expected = json.loads((DATA / "load_expected.json").read_text(encoding="utf-8"))
     assert len(records) == len(expected) == 2
+    assert records == expected
     assert [record.get("ID") for record in records] == [None, None]
     assert [record["pmid"] for record in records] == ["11223344", "11223345"]
     assert [record["title"] for record in records] == [
         "Paper title",
         "Paper title",
     ]
-    assert [record["journal"] for record in records] == ["MISQ", ""]
+    assert records[0]["journal"] == "MISQ"
+    assert "journal" not in records[1]
     assert records[0]["container_title"] == "Nature"
-    assert records[1]["booktitle"] == ["Nature", "ICIS"]
+    assert records[1]["booktitle"] == "Nature; ICIS"
 
 
 def test_csv_load_write_round_trip(tmp_path: Path) -> None:

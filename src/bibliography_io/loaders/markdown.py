@@ -10,9 +10,12 @@ from typing import Any
 from ..exceptions import BackendExecutionError
 from ..exceptions import OptionalBackendUnavailableError
 from ..normalization import _records_from_loaded_list
+from ..normalization import _records_from_un_normalized_list
 
 
-def load_markdown(text: str, *, source: str | Path) -> list[dict[str, Any]]:
+def load_markdown(
+    text: str, *, source: str | Path, normalize: bool = True
+) -> list[dict[str, Any]]:
     """Load reference-list Markdown through a plugin or the optional GROBID backend."""
     points = entry_points()
     matches = (
@@ -30,7 +33,11 @@ def load_markdown(text: str, *, source: str | Path) -> list[dict[str, Any]]:
             )
             if isinstance(result, dict):
                 result = list(result.values())
-            return _records_from_loaded_list(result)
+            return (
+                _records_from_loaded_list(result)
+                if normalize
+                else _records_from_un_normalized_list(result)
+            )
         except OptionalBackendUnavailableError:
             raise
         except Exception as exc:
@@ -39,7 +46,7 @@ def load_markdown(text: str, *, source: str | Path) -> list[dict[str, Any]]:
             ) from exc
 
     try:
-        return _load_with_grobid(text, source=source)
+        return _load_with_grobid(text, source=source, normalize=normalize)
     except OptionalBackendUnavailableError:
         raise
     except ImportError as exc:
@@ -53,7 +60,9 @@ def load_markdown(text: str, *, source: str | Path) -> list[dict[str, Any]]:
         ) from exc
 
 
-def _load_with_grobid(text: str, *, source: str | Path) -> list[dict[str, Any]]:
+def _load_with_grobid(
+    text: str, *, source: str | Path, normalize: bool = True
+) -> list[dict[str, Any]]:
     import requests
     from colrev.env.grobid_service import GrobidService
 
@@ -75,4 +84,4 @@ def _load_with_grobid(text: str, *, source: str | Path) -> list[dict[str, Any]]:
 
     from .bibtex import load_bibtex
 
-    return load_bibtex(bibtex)
+    return load_bibtex(bibtex, normalize=normalize)

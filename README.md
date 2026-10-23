@@ -66,7 +66,7 @@ text = dumps(records, format="bib")
 | Excel (`.xls`, `.xlsx`) | Yes | Yes | File APIs only |
 | Markdown (`.md`) | *Planned* | *Planned* | *Planned* |
 
-Markdown table serialization is built into the core.
+Markdown table writing is built into the core.
 Markdown reference-list parsing is planned as a separate optional feature; its
 backend and installation extra are not finalized. Requesting Markdown
 reference-list input without a registered backend raises
@@ -84,7 +84,7 @@ for test, lint, and documentation build instructions.
 
 The following libraries support additional bibliographic formats, conversion workflows, and reference extraction:
 
-- [**BibtexParser**](https://github.com/sciunto-org/python-bibtexparser) — A lightweight, actively maintained library for reading, writing, and modifying `.bib` files. Supports customizable parsing, field transformations, and BibTeX serialization. Best suited for general-purpose BibTeX processing.
+- [**BibtexParser**](https://github.com/sciunto-org/python-bibtexparser) — A lightweight, actively maintained library for reading, writing, and modifying `.bib` files. Supports customizable parsing, field transformations, and BibTeX writing. Best suited for general-purpose BibTeX processing.
 - [**Pybtex**](https://pybtex.org/) — A bibliography processing library that supports BibTeX parsing, citation formatting, and conversion between bibliography formats. Provides extensible formatting styles and output formats such as LaTeX, HTML, and plain text. Best suited for generating formatted references.
 - [**biblib**](https://pypi.org/project/biblib/) — A library for managing bibliographic databases, including merging entries, accessing metadata, and retrieving references using DOI or ISBN identifiers. Useful for building custom bibliography management workflows, although its last PyPI release was in 2018.
 - [**rispy**](https://github.com/MrTango/rispy) — A lightweight Python library for reading and writing RIS files. Supports configurable tag mappings and custom parsers/writers. Best suited for standalone RIS processing.

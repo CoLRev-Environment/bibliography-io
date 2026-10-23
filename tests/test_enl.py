@@ -1,4 +1,4 @@
-"""Tests for ENL loading and serialization using repository fixtures."""
+"""Tests for ENL loading and writing using repository fixtures."""
 
 from pathlib import Path
 

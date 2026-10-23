@@ -46,7 +46,7 @@ tags:
        standardize_field_names=True
    ) -> list[dict]
    loads(
-       text, *, format=..., source=None, source_version=None,
+       string, *, format=..., source=None, source_version=None,
        standardize_field_names=True
    ) -> list[dict]
 
@@ -85,7 +85,7 @@ The raw API follows these principles:
 - The optional ``source`` and ``source_version`` tags identify the system or
   provider that produced the data and, when relevant, its export version. They
   are distinct from ``format``: for example, ``format="xml"`` describes the
-  serialization, while ``source="web_of_science"`` identifies its origin
+  encoded representation, while ``source="web_of_science"`` identifies its origin
   (formats like ``xml`` may be provided by different sources with different
   syntax). ``source_version`` is a label for version-specific loading or export
   behavior.
@@ -117,16 +117,16 @@ in that pipeline. Conceptually, ``load_records()`` follows this sequence:
 .. code-block:: python
 
    def load_records(path, *, format=None, source=None, source_version=None):
-       text, resolved_format = read_input(path, format=format)
+        string, resolved_format = read_input(path, format=format)
        plugin = get_source_plugin(source) if source else None
 
        if plugin:
-           text = plugin.preprocess(
-               text, format=resolved_format,
+            string = plugin.preprocess(
+                string, format=resolved_format,
                source_version=source_version,
            )
 
-       records = parse(text, format=resolved_format)
+        records = parse(string, format=resolved_format)
        records = normalize_basic(records, plugin=plugin)
 
        if plugin:
@@ -139,10 +139,10 @@ in that pipeline. Conceptually, ``load_records()`` follows this sequence:
 
 ``read_input()`` resolves and reads the file, while ``parse()``,
 ``normalize_basic()``, and ``validate_records()`` represent core stages. The
-plugin's ``preprocess()`` hook can adapt source-specific input text before
+plugin's ``preprocess()`` hook can adapt source-specific input strings before
 parsing. ``postprocess()`` receives parsed, basically normalized records for
 source-specific transformations. The same stages apply to ``loads()`` after its
-input text and required format have been validated. With no source specified,
+input string and required format have been validated. With no source specified,
 the core uses its generic format handling and skips the plugin hooks.
 
 Source- and version-specific field-name mappings supplied by a plugin
@@ -232,7 +232,7 @@ Structured provenance fields are one use for these options; no particular
 provenance field name is required by this API.
 
 The existing ``colrev_origin`` convention stores references to contributing raw
-records as a list in the record data and serializes them in BibTeX as a
+records as a list in the record data and writes them in BibTeX as a
 semicolon-delimited value. For example, a primary record produced by
 deduplicating records loaded through the Raw Data API may contain:
 
@@ -276,7 +276,7 @@ order follows JSON/Python insertion order.
 
 Only fields explicitly declared with ``mapping_fields`` or ``list_fields`` may
 contain mapping/list values when writing BibTeX. Undeclared mappings, lists,
-tuples, and sets raise ``SerializationError``. On parsing, declared fields must
+tuples, and sets raise ``SerializationError``. On loading, declared fields must
 use this encoding and match their declared top-level container type; otherwise
 parsing raises ``ParseError``. Malformed Base64, UTF-8, or JSON raises
 ``ParseError``, with the underlying error chained. This versioned payload is

@@ -13,7 +13,7 @@ _STRUCTURED_BIB_PREFIX = "bibio-json-v1:"
 
 def _escape(value: Any) -> str:
     if isinstance(value, (dict, list, tuple, set)):
-        raise SerializationError(f"Cannot serialize non-scalar BibTeX value: {value!r}")
+        raise SerializationError(f"Cannot write non-scalar BibTeX value: {value!r}")
     return "{" + str(value).replace("}", r"\}") + "}"
 
 
@@ -24,18 +24,18 @@ def _encode_structured(value: Any, field: str) -> str:
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
         raise SerializationError(
-            f"Cannot serialize structured BibTeX field {field!r}: {exc}"
+            f"Cannot write structured BibTeX field {field!r}: {exc}"
         ) from exc
     return _STRUCTURED_BIB_PREFIX + base64.b64encode(payload).decode("ascii")
 
 
-def serialize_bibtex(
+def write_bibtex(
     records: dict[str, dict[str, Any]],
     *,
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
 ) -> str:
-    """Serialize normalized records to BibTeX."""
+    """Write normalized records as BibTeX."""
     entries = []
     for record in records.values():
         fields = []

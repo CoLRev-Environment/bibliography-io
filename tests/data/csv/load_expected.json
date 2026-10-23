@@ -1,0 +1,41 @@
+[
+  {
+    "pmid": "11223344",
+    "title": "Paper title",
+    "author": "Smith A, Walter B",
+    "citation": "Nature. 2021 Dec 21;1(2):10-11. doi: 10.1111/nature1111.",
+    "first_author": "Smith A",
+    "container_title": "Nature",
+    "year": "2021",
+    "create_date": "2021/12/21",
+    "pmcid": "PMC1122334",
+    "doi": "10.1111/nature1111",
+    "number_of_cited_references": "no Number-of-Cited-References",
+    "file_name": "no file",
+    "author_count": "2",
+    "citation_key": "test",
+    "cited_by": "no Times-Cited",
+    "number": "no issue",
+    "journal": "MISQ",
+    "ENTRYTYPE": "misc"
+  },
+  {
+    "pmid": "11223345",
+    "title": "Paper title",
+    "author": "Smith A, Walter B",
+    "citation": "Nature. 2021 Dec 21;1(2):10-11. doi: 10.1111/nature1111.",
+    "first_author": "Smith A",
+    "booktitle": "Nature; ICIS",
+    "year": "2021",
+    "create_date": "2021/12/21",
+    "pmcid": "PMC1122334",
+    "doi": "10.1111/nature1111",
+    "number_of_cited_references": "no Number-of-Cited-References",
+    "file_name": "no file",
+    "author_count": "2",
+    "citation_key": "test",
+    "cited_by": "no Times-Cited",
+    "number": "no issue",
+    "ENTRYTYPE": "misc"
+  }
+]

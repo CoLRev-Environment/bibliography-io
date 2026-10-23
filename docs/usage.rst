@@ -37,7 +37,7 @@ reference-list parsing only when the optional backend is installed.
 ``write_records`` writes BibTeX, RIS, CSV, Excel (``.xlsx``), and Markdown
 tables. JSON, ENL, NBIB, and legacy Excel (``.xls``) are read-only. ``dumps``
 supports BibTeX, RIS, CSV, and Markdown-table output. Excel is a file-only
-format; ``loads`` supports the text-based input formats.
+format; ``loads`` supports the string-based input formats.
 
 Format aliases include ``bibtex`` for BibTeX, ``excel`` for Excel, ``endnote``
 for ENL, and ``markdown`` for Markdown. File suffixes are case-insensitive.
@@ -61,10 +61,30 @@ Records are ordered mappings keyed by string ``ID`` values. Each record has
 assigned sequentially without collisions; duplicate IDs raise an error.
 Unknown fields are retained where the output format can represent them.
 
+Loaded records are **raw** in the sense that they have not been curated as
+primary records. ``load_records`` and ``loads`` return **normalized raw data**
+by default, for convenient access and as a fallback representation. Pass
+``normalize=False`` to access **non-normalized raw data** for maximum control
+or source-specific processing:
+
+.. code-block:: python
+
+   convenient = load_records("references.ris")
+   source_values = load_records("references.ris", normalize=False)
+
+Normalized raw data uses canonical field names, removes empty repeated values,
+deduplicates exact matches, and represents ordinary fields as strings. Multiple
+authors are joined with ``" and "`` and keywords with ``"; "``. Distinct
+non-empty repeated values for other fields are joined with ``"; "`` in their
+source order. Non-normalized values retain source-level field names and
+repeated-value structure where the format permits it; formats may have
+different limits on what source information can be represented. Explicitly
+declared structured BibTeX mappings and lists remain structured.
+
 Structured BibTeX fields
 ------------------------
 
-Nested mappings and lists can be serialized in BibTeX when callers explicitly
+Nested mappings and lists can be written to BibTeX when callers explicitly
 declare their field names. Use ``mapping_fields`` for top-level mappings and
 ``list_fields`` for top-level lists; nested lists/mappings within those values
 are preserved automatically.

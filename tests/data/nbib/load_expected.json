@@ -1,0 +1,23 @@
+[
+  {
+    "ENTRYTYPE": "article",
+    "own": "ERIC",
+    "pmid": "12345678",
+    "title": "Paper title",
+    "author": "Smith, Tom and Hunter, Shawn",
+    "keywords": "Keyword 1; Keyword 2; Keyword 3",
+    "journal": "Journal Name",
+    "so": "v10 n1 p1-10 2000",
+    "doi": "http://dx.doi.org/10.1000/123456789",
+    "oid": "EJ1131633",
+    "volume": "10",
+    "number": "1",
+    "pages": "1-9",
+    "year": "2000",
+    "lid": "http://eric.ed.gov/?id=EJ1131633",
+    "abstract": "Abstract ...",
+    "issn": "ISSN-1234-4567",
+    "la": "English",
+    "type": "reports_research"
+  }
+]

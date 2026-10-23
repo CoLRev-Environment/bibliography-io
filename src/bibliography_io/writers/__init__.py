@@ -11,30 +11,30 @@ from ..normalization import normalize_records
 WRITE_FORMATS = {"bib", "ris", "csv", "xlsx", "md"}
 
 
-def serialize(
+def write_string(
     records: Any,
     format: str,
     *,
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
 ) -> str:
-    """Normalize records and dispatch serialization to a format writer."""
-    fmt = normalize_format(format)
-    if fmt not in WRITE_FORMATS:
-        raise UnsupportedFormatError(f"Writing {fmt} is unsupported")
+    """Normalize records and dispatch writing to a format-specific writer."""
+    format_name = normalize_format(format)
+    if format_name not in WRITE_FORMATS:
+        raise UnsupportedFormatError(f"Writing {format_name} is unsupported")
     data = normalize_records(records)
-    if fmt == "bib":
-        from .bibtex import serialize_bibtex
+    if format_name == "bib":
+        from .bibtex import write_bibtex
 
-        return serialize_bibtex(
+        return write_bibtex(
             data, mapping_fields=mapping_fields, list_fields=list_fields
         )
-    if fmt == "ris":
-        from .ris import serialize_ris
+    if format_name == "ris":
+        from .ris import write_ris
 
-        return serialize_ris(data)
-    if fmt in {"csv", "md"}:
-        from .tabular import serialize_table
+        return write_ris(data)
+    if format_name in {"csv", "md"}:
+        from .tabular import write_table
 
-        return serialize_table(data, fmt)
-    raise UnsupportedFormatError(f"Writing {fmt} is unsupported")
+        return write_table(data, format=format_name)
+    raise UnsupportedFormatError(f"Writing {format_name} is unsupported")

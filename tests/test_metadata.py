@@ -1,4 +1,4 @@
-"""Tests for bibliography metadata serialization semantics."""
+"""Tests for bibliography metadata writing semantics."""
 
 import bibliography_io as bibio
 

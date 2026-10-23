@@ -7,8 +7,8 @@ from typing import Any
 from ..loaders.ris import RIS_MAP
 
 
-def serialize_ris(records: dict[str, dict[str, Any]]) -> str:
-    """Serialize normalized records to RIS."""
+def write_ris(records: dict[str, dict[str, Any]]) -> str:
+    """Write normalized records as RIS."""
     reverse = {value: key for key, value in RIS_MAP.items()}
     lines = []
     for record in records.values():

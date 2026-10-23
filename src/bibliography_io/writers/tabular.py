@@ -7,10 +7,10 @@ from io import StringIO
 from typing import Any
 
 
-def serialize_table(records: dict[str, dict[str, Any]], fmt: str) -> str:
-    """Serialize normalized records as CSV or a Markdown table."""
+def write_table(records: dict[str, dict[str, Any]], format: str) -> str:
+    """Write normalized records as CSV or a Markdown table."""
     fields = list(dict.fromkeys(key for record in records.values() for key in record))
-    if fmt == "csv":
+    if format == "csv":
         stream = StringIO(newline="")
         writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="raise")
         writer.writeheader()

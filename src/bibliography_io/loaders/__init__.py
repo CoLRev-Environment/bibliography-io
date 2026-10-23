@@ -1,4 +1,4 @@
-"""Format-specific loaders that convert input text to bibliography records."""
+"""Format-specific loaders that convert input strings to bibliography records."""
 
 from __future__ import annotations
 
@@ -9,46 +9,58 @@ from ..exceptions import BackendExecutionError
 from ..exceptions import OptionalBackendUnavailableError
 from ..exceptions import ParseError
 from ..exceptions import UnsupportedFormatError
+from ..normalization import normalize_loaded_records
 
 
-def load_text(
-    text: str,
-    fmt: str,
+def load_string(
+    string: str,
+    format: str,
     *,
+    normalize: bool = True,
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
     source: str | Path = "<string>",
 ) -> list[dict[str, Any]]:
-    """Load records from text by dispatching to the format-specific loader."""
+    """Load records from a string by dispatching to the format-specific loader."""
     try:
-        if fmt == "bib":
+        if format == "bib":
             from .bibtex import load_bibtex
 
-            return load_bibtex(
-                text, mapping_fields=mapping_fields, list_fields=list_fields
+            result = load_bibtex(
+                string,
+                mapping_fields=mapping_fields,
+                list_fields=list_fields,
+                normalize=normalize,
             )
-        if fmt == "ris":
+        elif format == "ris":
             from .ris import load_ris
 
-            return load_ris(text)
-        if fmt in {"enl", "nbib", "txt"}:
+            result = load_ris(string, normalize=normalize)
+        elif format in {"enl", "nbib", "txt"}:
             from .tagged import load_tagged
 
-            return load_tagged(text, fmt)
-        if fmt == "csv":
+            result = load_tagged(string, format=format, normalize=normalize)
+        elif format == "csv":
             from .tabular import load_csv
 
-            return load_csv(text)
-        if fmt == "json":
+            result = load_csv(string, normalize=normalize)
+        elif format == "json":
             from .json import load_json
 
-            return load_json(text)
-        if fmt == "md":
+            result = load_json(string, normalize=normalize)
+        elif format == "md":
             from .markdown import load_markdown
 
-            return load_markdown(text, source=source)
+            result = load_markdown(string, source=source, normalize=normalize)
+        else:
+            raise UnsupportedFormatError(f"Reading {format} is unsupported")
+        return (
+            normalize_loaded_records(result, list_fields=list_fields)
+            if normalize
+            else result
+        )
     except (BackendExecutionError, OptionalBackendUnavailableError, ParseError):
         raise
     except Exception as exc:
-        raise ParseError(f"Could not load {fmt} input: {exc}") from exc
-    raise UnsupportedFormatError(f"Reading {fmt} is unsupported")
+        raise ParseError(f"Could not load {format} input: {exc}") from exc
+    raise UnsupportedFormatError(f"Reading {format} is unsupported")

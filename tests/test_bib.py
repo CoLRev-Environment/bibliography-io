@@ -168,7 +168,7 @@ def test_structured_values_escape_arbitrary_text_and_preserve_scalar_types() -> 
     assert loads(text, format="bib", mapping_fields=["data"])[0]["data"] == value
 
 
-def test_undeclared_structures_keep_serialization_error() -> None:
+def test_undeclared_structures_keep_writing_error() -> None:
     records = {
         "example": {
             "ENTRYTYPE": "misc",

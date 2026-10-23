@@ -9,6 +9,7 @@ from typing import Any
 
 from ..exceptions import ParseError
 from ..normalization import _records_from_loaded_list
+from ..normalization import _records_from_un_normalized_list
 from ..normalization import normalize_source_record
 
 _STRUCTURED_BIB_PREFIX = "bibio-json-v1:"
@@ -43,6 +44,7 @@ def load_bibtex(
     *,
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
+    normalize: bool = True,
 ) -> list[dict[str, Any]]:
     """Load BibTeX entries, including explicitly declared structured fields."""
     parsed = []
@@ -116,7 +118,13 @@ def load_bibtex(
             normalize_source_record(
                 record, format="bib", field_aliases=BIBTEX_FIELD_ALIASES
             )
+            if normalize
+            else record
         )
     if text.strip() and not parsed:
         raise ParseError("No BibTeX entries found")
-    return _records_from_loaded_list(parsed)
+    return (
+        _records_from_loaded_list(parsed)
+        if normalize
+        else _records_from_un_normalized_list(parsed)
+    )
