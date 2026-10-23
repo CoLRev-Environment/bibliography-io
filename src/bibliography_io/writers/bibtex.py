@@ -127,7 +127,11 @@ def write_bibtex(
         field_order
         if field_order is not None
         else tuple(
-            normalize_field_name(field, preserve_dots=True)
+            normalize_field_name(
+                field,
+                preserve_dots=True,
+                preserve_dashes=field.startswith("colrev."),
+            )
             for field in _DEFAULT_FIELD_ORDER
         )
     )
@@ -141,10 +145,18 @@ def write_bibtex(
                 ordered_fields,
                 key=lambda item: (
                     field_positions.get(
-                        normalize_field_name(item[0], preserve_dots=True),
+                        normalize_field_name(
+                            item[0],
+                            preserve_dots=True,
+                            preserve_dashes=item[0].startswith("colrev."),
+                        ),
                         len(field_positions),
                     ),
-                    normalize_field_name(item[0], preserve_dots=True),
+                    normalize_field_name(
+                        item[0],
+                        preserve_dots=True,
+                        preserve_dashes=item[0].startswith("colrev."),
+                    ),
                 ),
             )
         for key, value in ordered_fields:

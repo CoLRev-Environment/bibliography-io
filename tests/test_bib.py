@@ -110,6 +110,27 @@ def test_bibtex_writer_uses_fixed_field_width_for_long_field_names() -> None:
     assert "   colrev.vendor.identifier_that_exceeds_padding  = {value}," in text
 
 
+def test_bibtex_writer_preserves_dashes_in_colrev_extension_fields() -> None:
+    records = {
+        "example": {
+            "ENTRYTYPE": "article",
+            "ID": "example",
+            "colrev.web_of_science.unique-id": "WOS:123",
+            "colrev.web_of_science.article-number": "6756",
+            "article-number": "ordinary field",
+        }
+    }
+
+    text = to_string(records, format="bib")
+
+    assert "colrev.web_of_science.unique-id" in text
+    assert "colrev.web_of_science.article-number" in text
+    assert "article_number" in text
+    assert loads_raw(text, format="bib")[0]["colrev.web_of_science.unique-id"] == (
+        "WOS:123"
+    )
+
+
 @pytest.mark.parametrize(
     "value",
     [
@@ -186,7 +207,7 @@ def test_bibtex_writer_uses_default_colrev_field_order() -> None:
         "grobid_version",
         "colrev.dblp.dblp_key",
         "colrev.semantic_scholar.id",
-        "colrev.web_of_science.unique_id",
+        "colrev.web_of_science.unique-id",
         "author",
         "booktitle",
         "journal",

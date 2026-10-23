@@ -23,9 +23,15 @@ def normalize_field_name(
     *,
     field_aliases: Mapping[str, str] | None = None,
     preserve_dots: bool = False,
+    preserve_dashes: bool = False,
 ) -> str:
-    """Normalize a label and optionally apply aliases keyed by normalized names."""
-    pattern = r"[^a-z0-9.]+" if preserve_dots else r"[^a-z0-9]+"
+    """Normalize labels, optionally preserving punctuation and applying aliases."""
+    allowed_characters = "a-z0-9"
+    if preserve_dots:
+        allowed_characters += "."
+    if preserve_dashes:
+        allowed_characters += "-"
+    pattern = rf"[^{allowed_characters}]+"
     name = re.sub(pattern, "_", value.strip().lower()).strip("_")
     name = re.sub(r"_+", "_", name)
     return field_aliases.get(name, name) if field_aliases is not None else name
@@ -51,6 +57,7 @@ def normalize_source_record(
             str(field),
             field_aliases=field_aliases,
             preserve_dots=format == "bib",
+            preserve_dashes=format == "bib" and str(field).startswith("colrev."),
         )
         if key == "id" and format in _TABLE_FORMATS:
             normalized[key] = value
