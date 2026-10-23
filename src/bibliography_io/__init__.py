@@ -426,6 +426,17 @@ def write(
     normalized = normalize_records(
         records, format="bib" if format_name == "bib" else None
     )
+    if primary and mappings:
+        normalized = {
+            record_id: {
+                key: value
+                for key, value in record.items()
+                if not (
+                    key.lower() in mappings and isinstance(value, dict) and not value
+                )
+            }
+            for record_id, record in normalized.items()
+        }
     if sort_by_id:
         normalized = sort_records_by_id(normalized)
     if primary:

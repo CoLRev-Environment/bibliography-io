@@ -288,6 +288,39 @@ def test_primary_dict_writer_validates_ids_and_round_trips_structured_fields(
         write([{"ID": "one", "ENTRYTYPE": "article"}], path=output, primary=True)
 
 
+def test_primary_writer_omits_empty_mapping_fields_only_for_primary_records(
+    tmp_path: Path,
+) -> None:
+    records = {
+        "one": {
+            "ID": "one",
+            "ENTRYTYPE": "article",
+            "empty_provenance": {},
+            "provenance": {"CURATED": {"source": "database", "note": ""}},
+        }
+    }
+    primary_output = tmp_path / "primary.bib"
+    raw_output = tmp_path / "raw.bib"
+
+    write(
+        records,
+        path=primary_output,
+        primary=True,
+        mapping_fields=["empty_provenance", "provenance"],
+    )
+    write(
+        records,
+        path=raw_output,
+        mapping_fields=["empty_provenance", "provenance"],
+    )
+
+    primary_text = primary_output.read_text(encoding="utf-8")
+    raw_text = raw_output.read_text(encoding="utf-8")
+    assert "empty_provenance" not in primary_text
+    assert "   provenance" in primary_text
+    assert "   empty_provenance" in raw_text
+
+
 def test_primary_writer_and_raw_writer_sort_ids_by_default(
     tmp_path: Path,
 ) -> None:
