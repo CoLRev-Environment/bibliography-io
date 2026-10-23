@@ -120,6 +120,7 @@ def write_bibtex(
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
     field_order: tuple[str, ...] | None = None,
+    sort_fields: bool = True,
 ) -> str:
     """Write normalized records as BibTeX."""
     preferred_fields = (
@@ -134,13 +135,18 @@ def write_bibtex(
     entries = []
     for record in records.values():
         fields = []
-        ordered_fields = sorted(
-            record.items(),
-            key=lambda item: field_positions.get(
-                normalize_field_name(item[0], preserve_dots=True),
-                len(field_positions),
-            ),
-        )
+        ordered_fields = record.items()
+        if sort_fields:
+            ordered_fields = sorted(
+                ordered_fields,
+                key=lambda item: (
+                    field_positions.get(
+                        normalize_field_name(item[0], preserve_dots=True),
+                        len(field_positions),
+                    ),
+                    normalize_field_name(item[0], preserve_dots=True),
+                ),
+            )
         for key, value in ordered_fields:
             if key in {"ID", "ENTRYTYPE"}:
                 continue

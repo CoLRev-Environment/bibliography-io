@@ -19,9 +19,12 @@ def write_string(
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
     field_order: tuple[str, ...] | None = None,
+    sort_fields: bool = True,
     sort_by_id: bool = True,
 ) -> str:
     """Normalize records and dispatch writing to a format-specific writer."""
+    if not isinstance(sort_fields, bool):
+        raise TypeError("sort_fields must be a bool")
     if not isinstance(sort_by_id, bool):
         raise TypeError("sort_by_id must be a bool")
     format_name = normalize_format(format)
@@ -38,6 +41,7 @@ def write_string(
             mapping_fields=mapping_fields,
             list_fields=list_fields,
             field_order=field_order,
+            sort_fields=sort_fields,
         )
     if format_name == "ris":
         from .ris import write_ris

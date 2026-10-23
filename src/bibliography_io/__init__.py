@@ -28,9 +28,12 @@ def write_string(
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
     field_order: Any = None,
+    sort_fields: bool = True,
     sort_by_id: bool = True,
 ) -> str:
     """Write records to a formatted string using the format-specific writer."""
+    if not isinstance(sort_fields, bool):
+        raise TypeError("sort_fields must be a bool")
     if not isinstance(sort_by_id, bool):
         raise TypeError("sort_by_id must be a bool")
     from .writers import write_string as dispatch
@@ -41,6 +44,7 @@ def write_string(
         mapping_fields=mapping_fields,
         list_fields=list_fields,
         field_order=_normalize_field_order(normalize_format(format), field_order),
+        sort_fields=sort_fields,
         sort_by_id=sort_by_id,
     )
 
@@ -333,6 +337,7 @@ def to_string(
     mapping_fields: Any = (),
     list_fields: Any = (),
     field_order: Any = None,
+    sort_fields: bool = True,
     sort_by_id: bool = True,
 ) -> str:
     """Return records written as a formatted string.
@@ -342,14 +347,16 @@ def to_string(
     other formats raises
     :class:`UnsupportedFormatError`. The declared names match the record field
     names (matching is case-insensitive, as BibTeX field names are).
-    ``field_order`` optionally specifies preferred BibTeX field order; fields
-    not listed are appended in their record order. If omitted, a CoLRev-oriented
-    field order is used.
+    By default, ``field_order`` (or the CoLRev-oriented order when omitted) is
+    followed by remaining fields alphabetically. Set ``sort_fields=False`` to
+    preserve the input field order without sorting.
     Inputs are sorted by record ID by default; set ``sort_by_id=False`` to
     preserve list order or mapping iteration order.
     """
     if not isinstance(sort_by_id, bool):
         raise TypeError("sort_by_id must be a bool")
+    if not isinstance(sort_fields, bool):
+        raise TypeError("sort_fields must be a bool")
     format_name = normalize_format(format)
     mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
     if format_name in {"xlsx", "xls"}:
@@ -362,6 +369,7 @@ def to_string(
         mapping_fields=mappings,
         list_fields=lists,
         field_order=_normalize_field_order(format_name, field_order),
+        sort_fields=sort_fields,
         sort_by_id=sort_by_id,
     )
 
@@ -374,6 +382,7 @@ def write(
     mapping_fields: Any = (),
     list_fields: Any = (),
     field_order: Any = None,
+    sort_fields: bool = True,
     primary: bool = False,
     sort_by_id: bool = True,
 ) -> None:
@@ -384,9 +393,10 @@ def write(
     other formats raises
     :class:`UnsupportedFormatError`. Set ``primary=True`` to validate an
     ID-keyed primary-record mapping, sort records by ID, and restrict output to
-    BibTeX. ``field_order`` optionally sets preferred BibTeX field order;
-    unlisted fields retain their record order. If omitted, a CoLRev-oriented
-    field order is used. Inputs are sorted by record ID by default; set
+    BibTeX. By default, ``field_order`` (or the CoLRev-oriented order when
+    omitted) is followed by remaining fields alphabetically. Set
+    ``sort_fields=False`` to preserve input field order without sorting. Inputs
+    are sorted by record ID by default; set
     ``sort_by_id=False`` to preserve list order or mapping iteration order.
     ``primary=True`` continues to sort the validated primary mapping by ID.
     """
@@ -394,6 +404,8 @@ def write(
         raise TypeError("primary must be a bool")
     if not isinstance(sort_by_id, bool):
         raise TypeError("sort_by_id must be a bool")
+    if not isinstance(sort_fields, bool):
+        raise TypeError("sort_fields must be a bool")
     destination = Path(path)
     format_name = _format_from_path(destination, format)
     if primary:
@@ -438,6 +450,7 @@ def write(
             mapping_fields=mappings,
             list_fields=lists,
             field_order=ordered_fields,
+            sort_fields=sort_fields,
             sort_by_id=False,
         )
     destination.write_text(output, encoding="utf-8")

@@ -8,6 +8,7 @@ from bibliography_io import to_string
 from bibliography_io import load_raw
 from bibliography_io import loads_raw
 from bibliography_io import write
+from bibliography_io import write_string
 from bibliography_io.exceptions import ParseError
 from bibliography_io.exceptions import RecordValidationError
 from bibliography_io.exceptions import SerializationError
@@ -205,14 +206,14 @@ def test_bibtex_writer_uses_default_colrev_field_order() -> None:
     assert actual_order == expected_order
 
 
-def test_bibtex_writer_custom_field_order_appends_unlisted_in_input_order() -> None:
+def test_bibtex_writer_sorts_unlisted_fields_alphabetically() -> None:
     records = {
         "example": {
             "ENTRYTYPE": "article",
-            "custom_first": "first",
+            "custom_second": "second",
             "title": "Title",
             "doi": "10.1234/example",
-            "custom_second": "second",
+            "custom_first": "first",
             "ID": "example",
         }
     }
@@ -223,6 +224,95 @@ def test_bibtex_writer_custom_field_order_appends_unlisted_in_input_order() -> N
         line.split(" = ", 1)[0].strip() for line in text.splitlines() if " = " in line
     ]
     assert actual_order == ["doi", "title", "custom_first", "custom_second"]
+
+
+def test_bibtex_default_order_sorts_extra_fields_after_colrev_fields() -> None:
+    records = {
+        "example": {
+            "ENTRYTYPE": "article",
+            "custom_z": "last alphabetically",
+            "title": "Title",
+            "custom_a": "first alphabetically",
+            "author": "Author",
+        }
+    }
+
+    text = to_string(records, format="bib")
+
+    actual_order = [
+        line.split(" = ", 1)[0].strip() for line in text.splitlines() if " = " in line
+    ]
+    assert actual_order == ["author", "title", "custom_a", "custom_z"]
+
+
+def test_bibtex_writer_can_preserve_all_field_input_order() -> None:
+    records = {
+        "example": {
+            "ENTRYTYPE": "article",
+            "custom_z": "last alphabetically",
+            "title": "Title",
+            "custom_a": "first alphabetically",
+            "doi": "10.1234/example",
+            "ID": "example",
+        }
+    }
+
+    text = to_string(records, format="bib", sort_fields=False)
+    dispatched_text = write_string(records, "bib", sort_fields=False)
+
+    actual_order = [
+        line.split(" = ", 1)[0].strip() for line in text.splitlines() if " = " in line
+    ]
+    assert actual_order == ["custom_z", "title", "custom_a", "doi"]
+    assert dispatched_text == text
+
+
+def test_bibtex_writer_custom_order_and_sort_opt_out() -> None:
+    records = {
+        "example": {
+            "ENTRYTYPE": "article",
+            "custom_z": "last alphabetically",
+            "title": "Title",
+            "custom_a": "first alphabetically",
+            "doi": "10.1234/example",
+            "ID": "example",
+        }
+    }
+
+    sorted_text = to_string(records, format="bib", field_order=["doi", "title"])
+    preserved_text = to_string(
+        records, format="bib", field_order=["doi", "title"], sort_fields=False
+    )
+
+    def field_names(text: str) -> list[str]:
+        return [
+            line.split(" = ", 1)[0].strip()
+            for line in text.splitlines()
+            if " = " in line
+        ]
+
+    assert field_names(sorted_text) == ["doi", "title", "custom_a", "custom_z"]
+    assert field_names(preserved_text) == ["custom_z", "title", "custom_a", "doi"]
+
+
+def test_sort_fields_does_not_change_non_bibtex_output() -> None:
+    records = {
+        "example": {
+            "ENTRYTYPE": "article",
+            "title": "Title",
+            "author": "Author",
+            "ID": "example",
+        }
+    }
+
+    assert to_string(records, format="ris", sort_fields=True) == to_string(
+        records, format="ris", sort_fields=False
+    )
+
+
+def test_sort_fields_must_be_a_boolean() -> None:
+    with pytest.raises(TypeError, match="sort_fields must be a bool"):
+        to_string({"example": {"ENTRYTYPE": "article"}}, format="bib", sort_fields=1)
 
 
 def test_file_writer_accepts_custom_field_order(tmp_path: Path) -> None:
@@ -244,6 +334,29 @@ def test_file_writer_accepts_custom_field_order(tmp_path: Path) -> None:
         line.split(" = ", 1)[0].strip() for line in text.splitlines() if " = " in line
     ]
     assert actual_order == ["title", "author"]
+
+
+def test_file_writer_can_preserve_field_input_order(tmp_path: Path) -> None:
+    output = tmp_path / "input-order.bib"
+    write(
+        {
+            "example": {
+                "ENTRYTYPE": "article",
+                "custom_z": "last alphabetically",
+                "title": "Title",
+                "custom_a": "first alphabetically",
+            }
+        },
+        path=output,
+        sort_fields=False,
+    )
+
+    actual_order = [
+        line.split(" = ", 1)[0].strip()
+        for line in output.read_text(encoding="utf-8").splitlines()
+        if " = " in line
+    ]
+    assert actual_order == ["custom_z", "title", "custom_a"]
 
 
 def test_field_order_is_bibtex_only_and_validated() -> None:

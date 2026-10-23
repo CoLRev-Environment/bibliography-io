@@ -165,9 +165,11 @@ identifiers, then bibliographic fields. This default order is
 ``colrev.semantic_scholar.id``, ``colrev.web_of_science.unique-id``,
 ``author``, ``booktitle``, ``journal``, ``title``, ``year``, ``volume``,
 ``number``, ``pages``, ``editor``, ``publisher``, ``url``, and ``abstract``.
-Fields not in this list are appended in their original record order. Pass
-``field_order`` to ``to_string()`` or ``write()`` to choose a different
-priority; unlisted fields are still appended in their original order:
+Fields not in this list are written alphabetically after the CoLRev-ordered
+fields. Pass ``field_order`` to ``to_string()`` or ``write()`` to choose a
+different preferred order; all remaining fields are still written
+alphabetically. Set ``sort_fields=False`` to preserve the input order of all
+fields, including the predefined or explicitly ordered fields:
 
 .. code-block:: python
 
@@ -177,8 +179,11 @@ priority; unlisted fields are still appended in their original order:
         field_order=["author", "title", "year", "doi"],
     )
 
-Field names in ``field_order`` are normalized like record field names. This
-option is supported for BibTeX output only.
+    original_order = to_string(records, format="bib", sort_fields=False)
+
+Field names in ``field_order`` are normalized like record field names. The
+``sort_fields`` option defaults to ``True`` and applies to BibTeX output;
+non-BibTeX writers are unaffected.
 
 BibTeX fields use a fixed 28-character field-name column, followed by two
 spaces and ``=``. Longer names extend beyond the aligned column. Fixed padding
