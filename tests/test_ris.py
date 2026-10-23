@@ -61,7 +61,9 @@ def test_ris_writer_preserves_all_fixture_records(tmp_path: Path) -> None:
     write(records, path=output)
     written = load_raw(output)
     assert len(written) == len(expected) == len(records)
-    for actual, wanted in zip(written, expected):
+    expected_by_id = {record["ID"]: record for record in expected}
+    for actual in written:
+        wanted = expected_by_id[actual["ID"]]
         for field in ("ID", "ENTRYTYPE", "title", "author"):
             assert actual[field] == wanted[field]
 

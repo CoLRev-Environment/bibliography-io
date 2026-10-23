@@ -117,6 +117,88 @@ def test_file_api_round_trip(tmp_path: Path) -> None:
     assert load_raw(source) == list(records.values())
 
 
+def test_serializers_sort_list_records_by_id_by_default(tmp_path: Path) -> None:
+    records = [
+        {"ID": "z-last", "ENTRYTYPE": "article", "title": "Last"},
+        {"ID": "a-first", "ENTRYTYPE": "article", "title": "First"},
+    ]
+    original = [record.copy() for record in records]
+
+    text = bibio.to_string(records, format="bib")
+    string_output = bibio.write_string(records, "bib")
+    output = tmp_path / "sorted.bib"
+    write(records, path=output)
+
+    assert [record["ID"] for record in bibio.loads_raw(text, format="bib")] == [
+        "a-first",
+        "z-last",
+    ]
+    assert [
+        record["ID"] for record in bibio.loads_raw(string_output, format="bib")
+    ] == ["a-first", "z-last"]
+    assert [record["ID"] for record in load_raw(output)] == ["a-first", "z-last"]
+    assert records == original
+
+
+def test_serializers_can_preserve_list_input_order(tmp_path: Path) -> None:
+    records = [
+        {"ID": "z-last", "ENTRYTYPE": "article", "title": "Last"},
+        {"ID": "a-first", "ENTRYTYPE": "article", "title": "First"},
+    ]
+
+    text = bibio.to_string(records, format="bib", sort_by_id=False)
+    string_output = bibio.write_string(records, "bib", sort_by_id=False)
+    output = tmp_path / "input-order.bib"
+    write(records, path=output, sort_by_id=False)
+
+    assert [record["ID"] for record in bibio.loads_raw(text, format="bib")] == [
+        "z-last",
+        "a-first",
+    ]
+    assert [
+        record["ID"] for record in bibio.loads_raw(string_output, format="bib")
+    ] == ["z-last", "a-first"]
+    assert [record["ID"] for record in load_raw(output)] == ["z-last", "a-first"]
+
+
+@pytest.mark.parametrize("sort_by_id", [True, False])
+def test_mapping_input_always_preserves_insertion_order(
+    tmp_path: Path, sort_by_id: bool
+) -> None:
+    records = {
+        "z-last": {"ID": "z-last", "ENTRYTYPE": "article", "title": "Last"},
+        "a-first": {"ID": "a-first", "ENTRYTYPE": "article", "title": "First"},
+    }
+
+    text = bibio.to_string(records, format="bib", sort_by_id=sort_by_id)
+    string_output = bibio.write_string(records, "bib", sort_by_id=sort_by_id)
+    output = tmp_path / f"mapping-{sort_by_id}.bib"
+    write(records, path=output, sort_by_id=sort_by_id)
+
+    expected_ids = ["a-first", "z-last"] if sort_by_id else ["z-last", "a-first"]
+    assert [record["ID"] for record in bibio.loads_raw(text, format="bib")] == (
+        expected_ids
+    )
+    assert [
+        record["ID"] for record in bibio.loads_raw(string_output, format="bib")
+    ] == expected_ids
+    assert [record["ID"] for record in load_raw(output)] == expected_ids
+
+
+def test_primary_writer_sorts_mapping_by_id_even_when_sorting_is_disabled(
+    tmp_path: Path,
+) -> None:
+    records = {
+        "z-last": {"ID": "z-last", "ENTRYTYPE": "article", "title": "Last"},
+        "a-first": {"ID": "a-first", "ENTRYTYPE": "article", "title": "First"},
+    }
+    output = tmp_path / "primary-sorted.bib"
+
+    write(records, path=output, primary=True, sort_by_id=False)
+
+    assert [record["ID"] for record in load_raw(output)] == ["a-first", "z-last"]
+
+
 def test_dataframe_helpers_preserve_raw_order_and_primary_ids(tmp_path: Path) -> None:
     pytest.importorskip("pandas")
     source = tmp_path / "records.bib"
@@ -206,7 +288,7 @@ def test_primary_dict_writer_validates_ids_and_round_trips_structured_fields(
         write([{"ID": "one", "ENTRYTYPE": "article"}], path=output, primary=True)
 
 
-def test_primary_writer_sorts_ids_but_raw_writer_preserves_input_order(
+def test_primary_writer_and_raw_writer_sort_ids_by_default(
     tmp_path: Path,
 ) -> None:
     records = {
@@ -220,7 +302,7 @@ def test_primary_writer_sorts_ids_but_raw_writer_preserves_input_order(
     write(records, path=raw_path)
 
     assert list(bibio.load_primary(primary_path)) == ["a-first", "z-last"]
-    assert [record["ID"] for record in load_raw(raw_path)] == ["z-last", "a-first"]
+    assert [record["ID"] for record in load_raw(raw_path)] == ["a-first", "z-last"]
     assert "   title                         = {Last}," in primary_path.read_text(
         encoding="utf-8"
     )

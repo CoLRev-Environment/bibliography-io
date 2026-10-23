@@ -44,6 +44,11 @@ Use ``write(..., primary=True)`` to write a primary-record mapping. This mode
 validates that records have unique, non-empty IDs and valid entry types, and
 only permits BibTeX output.
 
+Serialization sorts records by their record IDs by default for both list and
+mapping inputs. Set ``sort_by_id=False`` on ``write()``, ``to_string()``, or
+``write_string()`` to preserve list order or mapping iteration order. The
+``primary=True`` mode of ``write()`` continues to sort primary records by ID.
+
 Format aliases include ``bibtex`` for BibTeX, ``excel`` for Excel, ``endnote``
 for ENL, and ``markdown`` for Markdown. File suffixes are case-insensitive.
 

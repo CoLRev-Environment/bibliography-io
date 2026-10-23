@@ -182,6 +182,13 @@ def normalize_records(
     return output
 
 
+def sort_records_by_id(
+    records: OrderedDict[str, dict[str, Any]],
+) -> OrderedDict[str, dict[str, Any]]:
+    """Return records in record-ID order without changing the input mapping."""
+    return OrderedDict(sorted(records.items(), key=lambda item: item[1]["ID"]))
+
+
 def _records_from_loaded_list(
     items: list[dict[str, Any]],
     *,

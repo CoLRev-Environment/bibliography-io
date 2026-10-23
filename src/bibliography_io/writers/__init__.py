@@ -7,6 +7,7 @@ from typing import Any
 from ..exceptions import UnsupportedFormatError
 from ..normalization import normalize_format
 from ..normalization import normalize_records
+from ..normalization import sort_records_by_id
 
 WRITE_FORMATS = {"bib", "ris", "csv", "xlsx", "md"}
 
@@ -18,12 +19,17 @@ def write_string(
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
     field_order: tuple[str, ...] | None = None,
+    sort_by_id: bool = True,
 ) -> str:
     """Normalize records and dispatch writing to a format-specific writer."""
+    if not isinstance(sort_by_id, bool):
+        raise TypeError("sort_by_id must be a bool")
     format_name = normalize_format(format)
     if format_name not in WRITE_FORMATS:
         raise UnsupportedFormatError(f"Writing {format_name} is unsupported")
     data = normalize_records(records, format="bib" if format_name == "bib" else None)
+    if sort_by_id:
+        data = sort_records_by_id(data)
     if format_name == "bib":
         from .bibtex import write_bibtex
 
