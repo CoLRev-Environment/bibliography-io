@@ -194,9 +194,9 @@ The primary-data interfaces are:
        text, *, mapping_fields=(), list_fields=()
    ) -> dict[str, dict]
 
-   write_records_dict(
-       records, *, path, mapping_fields=(), list_fields=()
-   ) -> None
+    write_records(
+        records, *, path, format=None, mapping_fields=(), list_fields=()
+    ) -> None
 
 The primary-data API follows these principles:
 
