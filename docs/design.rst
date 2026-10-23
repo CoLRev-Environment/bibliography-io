@@ -76,6 +76,12 @@ The raw API follows these principles:
 - Unknown fields are preserved and are not silently discarded. If the selected
   destination format cannot represent a field or value, writing raises
   ``SerializationError``.
+- With ``normalize=False``, field values retain their parser-level types; for
+  example, ``author`` may be a string, list, or mapping depending on the source
+  format. With the default ``normalize=True``, common bibliographic fields such
+  as ``author`` are represented as predictable strings for downstream use.
+  Normalization may be lossy, so callers that need the source structure should
+  use ``normalize=False``.
 - By default, field names use the standardization currently built into
   bibliography-io. A source-specific package may provide source- and
   version-specific field-name mappings or preprocessing as a plugin; see
@@ -215,6 +221,9 @@ The primary-data API follows these principles:
   dictionary shape with only ``ID`` and ``ENTRYTYPE`` in each record; the default
   ``False`` returns complete records.
 - Entry types are open, lowercase strings.
+- Ordinary bibliographic field values in primary records are strings. Mapping
+  and list values are supported only for fields explicitly declared through
+  ``mapping_fields`` or ``list_fields``.
 - ``mapping_fields`` and ``list_fields`` declare BibTeX fields that may contain
   structured mapping and list values, respectively. These options can
   represent structured provenance without mandating particular provenance field
