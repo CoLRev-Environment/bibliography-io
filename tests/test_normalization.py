@@ -12,6 +12,12 @@ from bibliography_io.writers.tabular import write_table
 
 def test_field_aliases_are_source_specific_and_opt_in() -> None:
     assert normalize_field_name("T1") == "t1"
+    assert (
+        normalize_field_name("colrev.vendor.identifier") == "colrev_vendor_identifier"
+    )
+    assert normalize_field_name("colrev.vendor.identifier", preserve_dots=True) == (
+        "colrev.vendor.identifier"
+    )
     assert normalize_field_name("T1", field_aliases=RIS_FIELD_ALIASES) == "title"
     assert normalize_source_record({"journaltitle": "Journal"}) == {
         "journaltitle": "Journal"

@@ -103,22 +103,27 @@ non-empty repeated values for other fields are joined with ``"; "`` in their
 source order. Non-normalized values retain source-level field names and
 repeated-value structure where the format permits it; formats may have
 different limits on what source information can be represented. Explicitly
-declared structured BibTeX mappings and lists remain structured.
+declared BibTeX provenance mappings and lists retain their container types when
+loaded with the corresponding field declarations.
 
 Structured BibTeX fields
 ------------------------
 
-Nested mappings and lists can be written to BibTeX when callers explicitly
-declare their field names. Use ``mapping_fields`` for top-level mappings and
-``list_fields`` for top-level lists; nested lists/mappings within those values
-are preserved automatically.
+Provenance mappings and lists can be written to BibTeX when callers explicitly
+declare their field names. A mapping value is a Python dictionary from field
+names to ``{"source": ..., "note": ...}`` dictionaries. Nested arbitrary
+mappings are not supported. List values are Python lists of strings. Each
+provenance or list item is serialized in the legacy semicolon-delimited form.
 
 .. code-block:: python
 
     from bibliography_io import to_string
     from bibliography_io import loads_raw
 
-    provenance = {"CURATED": {"source": "github...", "note": ""}}
+    provenance = {
+        "author": {"source": "ebsco_bib.bib/11111111111111111", "note": ""},
+        "title": {"source": "manual.bib/entry1", "note": "checked"},
+    }
     records = {
         "example": {
             "ENTRYTYPE": "article",
@@ -136,10 +141,41 @@ are preserved automatically.
         mapping_fields=["colrev_masterdata_provenance"],
     )
 
-The file APIs accept the same options. The ``bibio-json-v1:`` encoding uses
-compact JSON encoded as UTF-8 and Base64 inside a standard BibTeX braced value.
-It preserves JSON strings, delimiters, braces, quotes, backslashes, Unicode,
-booleans, numbers, nulls, and empty/nested containers. Undeclared mappings and
-lists still raise ``SerializationError``. Structured-field options supplied to
-non-BibTeX formats raise ``UnsupportedFormatError``. See :doc:`design` for the
-full encoding and error contract.
+The mapping is written as entries such as ``author:source;;``; list values are
+written as semicolon-terminated items. The file APIs accept the same options.
+Mapping and list values must follow these provenance conventions; values that
+cannot be represented with the delimiters raise ``SerializationError``.
+Structured-field options supplied to non-BibTeX formats raise
+``UnsupportedFormatError``. See :doc:`design` for the full format contract.
+
+BibTeX field ordering
+---------------------
+
+BibTeX output uses a CoLRev-oriented field order by default: origin, status,
+provenance, PDF and screening metadata, file and exclusion metadata, DOI and
+identifiers, then bibliographic fields. This default order is
+``colrev_origin``, ``colrev_status``, ``colrev_masterdata_provenance``,
+``colrev_data_provenance``, ``colrev_pdf_id``, ``screening_criteria``, ``file``,
+``prescreen_exclusion``, ``doi``, ``grobid-version``, ``colrev.dblp.dblp_key``,
+``colrev.semantic_scholar.id``, ``colrev.web_of_science.unique-id``,
+``author``, ``booktitle``, ``journal``, ``title``, ``year``, ``volume``,
+``number``, ``pages``, ``editor``, ``publisher``, ``url``, and ``abstract``.
+Fields not in this list are appended in their original record order. Pass
+``field_order`` to ``to_string()`` or ``write()`` to choose a different
+priority; unlisted fields are still appended in their original order:
+
+.. code-block:: python
+
+    bibtex = to_string(
+        records,
+        format="bib",
+        field_order=["author", "title", "year", "doi"],
+    )
+
+Field names in ``field_order`` are normalized like record field names. This
+option is supported for BibTeX output only.
+
+BibTeX fields use a fixed 28-character field-name column, followed by two
+spaces and ``=``. Longer names extend beyond the aligned column. Fixed padding
+keeps the whitespace on other fields unchanged as fields are added or renamed,
+which helps preserve Git history diffs.

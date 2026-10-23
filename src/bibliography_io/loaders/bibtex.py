@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import base64
-import json
 import re
 from typing import Any
 
@@ -12,31 +10,97 @@ from ..normalization import _records_from_loaded_list
 from ..normalization import _records_from_un_normalized_list
 from ..normalization import normalize_source_record
 
-_STRUCTURED_BIB_PREFIX = "bibio-json-v1:"
 BIBTEX_FIELD_ALIASES = {
     "journaltitle": "journal",
     "shortjournal": "journal_abbreviation",
 }
 
 
-def _decode_structured_value(value: str, field: str) -> Any:
-    if not value.startswith(_STRUCTURED_BIB_PREFIX):
-        raise ParseError(
-            f"BibTeX field {field!r} is declared structured but does not use "
-            f"the {_STRUCTURED_BIB_PREFIX!r} encoding"
-        )
-    try:
-        payload = base64.b64decode(value[len(_STRUCTURED_BIB_PREFIX) :], validate=True)
-        result = json.loads(payload.decode("utf-8"))
-    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ParseError(
-            f"Malformed structured value in BibTeX field {field!r}"
-        ) from exc
-    if not isinstance(result, (dict, list)):
-        raise ParseError(
-            f"Structured BibTeX field {field!r} must decode to a mapping or list"
-        )
+def _parse_fields(body: str) -> list[tuple[str, str]]:
+    """Parse field assignments while allowing arbitrarily nested braces."""
+    assignments = re.compile(r"([\w.-]+)\s*=\s*")
+    fields = []
+    position = 0
+    while match := assignments.search(body, position):
+        value_start = match.end()
+        if value_start >= len(body):
+            break
+        if body[value_start] == "{":
+            depth, escaped = 0, False
+            value_end = value_start
+            while value_end < len(body):
+                char = body[value_end]
+                if not escaped:
+                    if char == "{":
+                        depth += 1
+                    elif char == "}":
+                        depth -= 1
+                        if depth == 0:
+                            value_end += 1
+                            break
+                escaped = char == "\\" and not escaped
+                if char != "\\":
+                    escaped = False
+                value_end += 1
+            if depth:
+                raise ParseError(
+                    f"Unterminated braced BibTeX value for field {match.group(1)!r}"
+                )
+        elif body[value_start] == '"':
+            escaped = False
+            value_end = value_start + 1
+            while value_end < len(body):
+                char = body[value_end]
+                if char == '"' and not escaped:
+                    value_end += 1
+                    break
+                escaped = char == "\\" and not escaped
+                if char != "\\":
+                    escaped = False
+                value_end += 1
+            else:
+                raise ParseError(
+                    f"Unterminated quoted BibTeX value for field {match.group(1)!r}"
+                )
+        else:
+            value_end = value_start
+            while value_end < len(body) and body[value_end] not in ", \t\r\n":
+                value_end += 1
+        fields.append((match.group(1), body[value_start:value_end]))
+        position = value_end
+    return fields
+
+
+def _decode_mapping(value: str, field: str) -> dict[str, dict[str, str]]:
+    """Parse legacy provenance entries in ``field:source;note;`` form."""
+    if not value.strip():
+        return {}
+    pattern = re.compile(r"([^:;\s]+):([^;]*);([^;]*);")
+    result = {}
+    consumed = []
+    for match in pattern.finditer(value):
+        name, source, note = match.groups()
+        if name in result:
+            raise ParseError(
+                f"Duplicate provenance key {name!r} in BibTeX field {field!r}"
+            )
+        result[name] = {"source": source.strip(), "note": note.strip()}
+        consumed.append((match.start(), match.end()))
+    remainder = value
+    for start, end in reversed(consumed):
+        remainder = remainder[:start] + remainder[end:]
+    if not result or remainder.strip():
+        raise ParseError(f"Malformed provenance mapping in BibTeX field {field!r}")
     return result
+
+
+def _decode_list(value: str, field: str) -> list[str]:
+    """Parse semicolon-delimited BibTeX list values."""
+    if not value.strip():
+        return []
+    if not value.rstrip().endswith(";"):
+        raise ParseError(f"Malformed list in BibTeX field {field!r}")
+    return [item.strip() for item in value.split(";") if item.strip()]
 
 
 def load_bibtex(
@@ -59,17 +123,17 @@ def load_bibtex(
             if char == '"' and not escaped and brace == 0:
                 quoted = not quoted
             elif not quoted:
-                if char == "{":
+                if char == "{" and not escaped:
                     brace += 1
-                elif char == "}" and brace:
+                elif char == "}" and not escaped and brace:
                     brace -= 1
-                elif brace == 0 and char == closing:
+                elif brace == 0 and char == closing and not escaped:
                     depth -= 1
                     if depth == 0:
                         break
-                elif brace == 0 and char == "(":
+                elif brace == 0 and char == "(" and not escaped:
                     depth += 1
-                elif brace == 0 and char == ")" and closing == ")":
+                elif brace == 0 and char == ")" and closing == ")" and not escaped:
                     depth -= 1
                     if depth == 0:
                         break
@@ -83,18 +147,14 @@ def load_bibtex(
         }
         if not header_only:
             body = text[start:end]
-            for field in re.finditer(
-                r'([\w-]+)\s*=\s*(\{(?:[^{}]|\{[^{}]*\})*\}|"(?:[^"]|\\.)*"|[^,\s]+)\s*,?',
-                body,
-                re.DOTALL,
-            ):
-                raw_value = field.group(2).strip()
+            for field_name, raw_value in _parse_fields(body):
+                raw_value = raw_value.strip()
                 value = raw_value
                 if (value.startswith("{") and value.endswith("}")) or (
                     value.startswith('"') and value.endswith('"')
                 ):
                     value = value[1:-1]
-                field_name = field.group(1).lower()
+                field_name = field_name.lower()
                 value = value.strip()
                 if field_name in mapping_fields | list_fields:
                     if not raw_value.startswith("{"):
@@ -102,18 +162,11 @@ def load_bibtex(
                             f"Structured BibTeX field {field_name!r} must use a braced value"
                         )
                     value = value.lstrip("{").rstrip("}")
-                    prefix_index = value.find(_STRUCTURED_BIB_PREFIX)
-                    if prefix_index >= 0:
-                        value = value[prefix_index:]
-                    decoded = _decode_structured_value(value, field_name)
-                    expected_type = dict if field_name in mapping_fields else list
-                    expected_label = "mapping" if expected_type is dict else "list"
-                    if not isinstance(decoded, expected_type):
-                        raise ParseError(
-                            f"Structured BibTeX field {field_name!r} was declared as a "
-                            f"{expected_label} field but does not decode to a {expected_label}"
-                        )
-                    record[field_name] = decoded
+                    record[field_name] = (
+                        _decode_mapping(value, field_name)
+                        if field_name in mapping_fields
+                        else _decode_list(value, field_name)
+                    )
                 else:
                     record[field_name] = value
         parsed.append(
@@ -126,7 +179,7 @@ def load_bibtex(
     if text.strip() and not parsed:
         raise ParseError("No BibTeX entries found")
     return (
-        _records_from_loaded_list(parsed)
+        _records_from_loaded_list(parsed, format="bib")
         if normalize
         else _records_from_un_normalized_list(parsed)
     )

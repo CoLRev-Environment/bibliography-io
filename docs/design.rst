@@ -208,7 +208,8 @@ The primary-data API follows these principles:
 
 - Primary loaders accept supported input formats and return records indexed by
   ID. Pass ``primary=True`` to ``write()`` to validate primary records and
-  restrict writing to BibTeX.
+  restrict writing to BibTeX. Primary records are written in ascending ID
+  order; ordinary/raw writes preserve the supplied record order.
 - Loads return an ID-indexed dictionary. Every record must have a valid, unique
   string ``ID``; missing and duplicate IDs raise ``MissingRecordIDError`` and
   ``DuplicateRecordIDError``, respectively. The API does not generate IDs or
@@ -225,21 +226,21 @@ The primary-data API follows these principles:
 - Ordinary bibliographic field values in primary records are strings. Mapping
   and list values are supported only for fields explicitly declared through
   ``mapping_fields`` or ``list_fields``.
-- ``mapping_fields`` and ``list_fields`` declare BibTeX fields that may contain
-  structured mapping and list values, respectively. These options can
-  represent structured provenance without mandating particular provenance field
-  names.
+- ``mapping_fields`` and ``list_fields`` declare BibTeX fields that contain
+  provenance mappings and string lists, respectively. These options are
+  available for primary writes and ordinary/raw writes.
 
 Structured fields
 ~~~~~~~~~~~~~~~~~
 
-The primary-data loading and writing interfaces support ``mapping_fields`` and
-``list_fields``. These field-name iterables declare BibTeX fields whose values
-are mappings or lists, respectively. Declared fields are matched
-case-insensitively against BibTeX field names. Values must have the declared
-top-level type. Fields cannot be declared as both mappings and lists.
-Structured provenance fields are one use for these options; no particular
-provenance field name is required by this API.
+The BibTeX loading and writing interfaces support ``mapping_fields`` and
+``list_fields``. These field-name iterables declare BibTeX fields whose Python
+values are dictionaries or lists. Declared fields are matched case-insensitively
+against BibTeX field names. Values must have the declared top-level type. Fields
+cannot be declared as both mappings and lists. Mappings are specifically for
+provenance in the shape ``{field: {"source": str, "note": str}}``; arbitrary
+nested mappings are not supported. Lists contain strings. Dots are accepted in
+BibTeX field keys and preserved by BibTeX loading and writing.
 
 The existing ``colrev_origin`` convention stores references to contributing raw
 records as a list in the record data and writes them in BibTeX as a
@@ -264,34 +265,32 @@ The corresponding BibTeX representation is:
 
    @article{merged-1,
      title = {An example},
-     colrev_origin = {CROSSREF.bib/001792;
-                      DBLP.bib/001703;}
+   colrev_origin = {CROSSREF.bib/001792;
+                    DBLP.bib/001703;},
    }
 
 Each locator identifies an individual raw record that contributed to the
 deduplicated primary record. This is an example of the existing ``colrev_origin``
 convention, not a requirement for a particular ``colrev_*`` provenance field.
-This semicolon-delimited representation is distinct from the versioned JSON
-encoding used for generic structured fields declared with ``mapping_fields`` or
-``list_fields``.
+Provenance mappings use the legacy ``field:source;note;`` representation, one
+entry per line. An empty note therefore yields ``field:source;;``. List values
+use one semicolon-terminated item per line. Both are wrapped in ordinary
+BibTeX braces, and each emitted BibTeX field ends with a comma, including the
+last field in an entry. Semicolons, braces, and newlines are reserved delimiters
+and are rejected inside source, note, and list-item values. Empty mappings and
+lists are written as empty braced values. The loader parses these forms back
+into Python dictionaries and lists when the corresponding fields are declared.
 
-Structured values are compact JSON (``ensure_ascii=True``, no NaN/Infinity),
-encoded as UTF-8, then Base64, prefixed by ``bibio-json-v1:`` and wrapped in a
-normal BibTeX braced value. The prefix is inside the braces. JSON provides
-unambiguous delimiters and escaping: strings preserve braces, quotes,
-backslashes, punctuation, whitespace, and Unicode; booleans remain JSON
-``true``/``false``; integers/floats remain JSON numbers; null remains JSON ``null``;
-and nested mappings/lists and empty containers retain their shape. Mapping key
-order follows JSON/Python insertion order.
+BibTeX field names are padded to a fixed width of 28 characters before the two
+spaces preceding ``=``. This width matches ``colrev_masterdata_provenance``;
+longer field names extend past the aligned column. Fixed-width padding keeps
+unrelated field lines stable when fields are added or renamed, helping preserve
+useful Git history diffs.
 
 Only fields explicitly declared with ``mapping_fields`` or ``list_fields`` may
 contain mapping/list values when writing BibTeX. Undeclared mappings, lists,
-tuples, and sets raise ``SerializationError``. On loading, declared fields must
-use this encoding and match their declared top-level container type; otherwise
-parsing raises ``ParseError``. Malformed Base64, UTF-8, or JSON raises
-``ParseError``, with the underlying error chained. This versioned payload is
-intended for bibliography-io round trips and is not interpreted as a native
-Python mapping by generic BibTeX tools.
+tuples, and sets raise ``SerializationError``. Values that cannot be represented
+with the provenance delimiters raise ``SerializationError``.
 
 Exceptions
 ----------

@@ -17,17 +17,21 @@ def write_string(
     *,
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
+    field_order: tuple[str, ...] | None = None,
 ) -> str:
     """Normalize records and dispatch writing to a format-specific writer."""
     format_name = normalize_format(format)
     if format_name not in WRITE_FORMATS:
         raise UnsupportedFormatError(f"Writing {format_name} is unsupported")
-    data = normalize_records(records)
+    data = normalize_records(records, format="bib" if format_name == "bib" else None)
     if format_name == "bib":
         from .bibtex import write_bibtex
 
         return write_bibtex(
-            data, mapping_fields=mapping_fields, list_fields=list_fields
+            data,
+            mapping_fields=mapping_fields,
+            list_fields=list_fields,
+            field_order=field_order,
         )
     if format_name == "ris":
         from .ris import write_ris

@@ -19,10 +19,14 @@ _TABLE_FORMATS = {"csv", "xlsx", "xls"}
 
 
 def normalize_field_name(
-    value: str, *, field_aliases: Mapping[str, str] | None = None
+    value: str,
+    *,
+    field_aliases: Mapping[str, str] | None = None,
+    preserve_dots: bool = False,
 ) -> str:
     """Normalize a label and optionally apply aliases keyed by normalized names."""
-    name = re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+    pattern = r"[^a-z0-9.]+" if preserve_dots else r"[^a-z0-9]+"
+    name = re.sub(pattern, "_", value.strip().lower()).strip("_")
     name = re.sub(r"_+", "_", name)
     return field_aliases.get(name, name) if field_aliases is not None else name
 
@@ -43,7 +47,11 @@ def normalize_source_record(
         if str(field).lower() == "entrytype":
             normalized["ENTRYTYPE"] = value
             continue
-        key = normalize_field_name(str(field), field_aliases=field_aliases)
+        key = normalize_field_name(
+            str(field),
+            field_aliases=field_aliases,
+            preserve_dots=format == "bib",
+        )
         if key == "id" and format in _TABLE_FORMATS:
             normalized[key] = value
             continue
@@ -103,7 +111,10 @@ def normalize_format(value: str) -> str:
 
 
 def normalize_records(
-    records: Any, *, field_aliases: Mapping[str, str] | None = None
+    records: Any,
+    *,
+    field_aliases: Mapping[str, str] | None = None,
+    format: str | None = None,
 ) -> OrderedDict[str, dict[str, Any]]:
     """Validate output records and key them by unique IDs.
 
@@ -117,7 +128,9 @@ def normalize_records(
                 raise RecordValidationError(
                     f"record at position {index} must be a mapping"
                 )
-            record = normalize_source_record(dict(raw), field_aliases=field_aliases)
+            record = normalize_source_record(
+                dict(raw), format=format, field_aliases=field_aliases
+            )
             record_id = record.get("ID")
             if record_id is None or str(record_id).strip() == "":
                 record_id = str(index)
@@ -145,7 +158,9 @@ def normalize_records(
     for mapping_id, raw in records.items():
         if not isinstance(raw, dict):
             raise RecordValidationError(f"record {mapping_id!r} must be a mapping")
-        record = normalize_source_record(dict(raw), field_aliases=field_aliases)
+        record = normalize_source_record(
+            dict(raw), format=format, field_aliases=field_aliases
+        )
         record_id = record.get("ID", mapping_id)
         if record_id is None or str(record_id).strip() == "":
             candidate = 1
@@ -168,14 +183,19 @@ def normalize_records(
 
 
 def _records_from_loaded_list(
-    items: list[dict[str, Any]], *, field_aliases: Mapping[str, str] | None = None
+    items: list[dict[str, Any]],
+    *,
+    field_aliases: Mapping[str, str] | None = None,
+    format: str | None = None,
 ) -> list[dict[str, Any]]:
     """Validate parsed records without altering IDs or collapsing duplicates."""
     output = []
     for raw in items:
         if not isinstance(raw, dict):
             raise ParseError("Each record must be a mapping")
-        record = normalize_source_record(dict(raw), field_aliases=field_aliases)
+        record = normalize_source_record(
+            dict(raw), format=format, field_aliases=field_aliases
+        )
         entrytype = record.get("ENTRYTYPE", "misc")
         if not isinstance(entrytype, str) or not entrytype.strip():
             raise RecordValidationError(
@@ -203,11 +223,14 @@ def normalize_loaded_records(
     *,
     field_aliases: Mapping[str, str] | None = None,
     list_fields: frozenset[str] = frozenset(),
+    format: str | None = None,
 ) -> list[dict[str, Any]]:
     """Return convenient scalar-valued raw records from parsed records."""
     output = []
     for raw in records:
-        record = normalize_source_record(dict(raw), field_aliases=field_aliases)
+        record = normalize_source_record(
+            dict(raw), format=format, field_aliases=field_aliases
+        )
         for field, value in list(record.items()):
             if (
                 field in {"ID", "ENTRYTYPE"}

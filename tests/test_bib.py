@@ -85,13 +85,176 @@ def test_bibtex_writer_aligns_fields_per_entry() -> None:
 
     assert text == (
         "@article{first,\n"
-        "  author        = {Example, Alex},\n"
-        "  colrev_status = {md_prepared}\n"
+        "   colrev_status                 = {md_prepared},\n"
+        "   author                        = {Example, Alex},\n"
         "}\n\n"
         "@misc{second,\n"
-        "  title = {Standalone}\n"
+        "   title                         = {Standalone},\n"
         "}"
     )
+
+
+def test_bibtex_writer_uses_fixed_field_width_for_long_field_names() -> None:
+    records = {
+        "example": {
+            "ENTRYTYPE": "misc",
+            "title": "Title",
+            "colrev.vendor.identifier_that_exceeds_padding": "value",
+        }
+    }
+
+    text = to_string(records, format="bib")
+
+    assert "   title                         = {Title}," in text
+    assert "   colrev.vendor.identifier_that_exceeds_padding  = {value}," in text
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "The Journal for {CAPITALLETTER} easy writing",
+        "The Journal for {CAPITAL {NESTED} GROUP} easy writing",
+    ],
+)
+def test_bibtex_writer_preserves_nested_braces(value: str) -> None:
+    records = {"example": {"ENTRYTYPE": "article", "journal": value}}
+
+    text = to_string(records, format="bib")
+
+    assert f"{{{value}}}" in text
+    assert r"\}" not in text
+    assert loads_raw(text, format="bib")[0]["journal"] == value
+
+
+@pytest.mark.parametrize("value", ["unmatched }", "unmatched {"])
+def test_bibtex_writer_rejects_unbalanced_braces(value: str) -> None:
+    records = {"example": {"ENTRYTYPE": "article", "title": value}}
+
+    with pytest.raises(SerializationError, match="unbalanced braces"):
+        to_string(records, format="bib")
+
+
+def test_bibtex_writer_uses_default_colrev_field_order() -> None:
+    fields = [
+        "colrev_origin",
+        "colrev_status",
+        "colrev_masterdata_provenance",
+        "colrev_data_provenance",
+        "colrev_pdf_id",
+        "screening_criteria",
+        "file",
+        "prescreen_exclusion",
+        "doi",
+        "grobid-version",
+        "colrev.dblp.dblp_key",
+        "colrev.semantic_scholar.id",
+        "colrev.web_of_science.unique-id",
+        "author",
+        "booktitle",
+        "journal",
+        "title",
+        "year",
+        "volume",
+        "number",
+        "pages",
+        "editor",
+        "publisher",
+        "url",
+        "abstract",
+    ]
+    records = {
+        "example": {
+            "ENTRYTYPE": "article",
+            "ID": "example",
+            **{field: field for field in reversed(fields)},
+        }
+    }
+
+    text = to_string(records, format="bib")
+
+    expected_order = [
+        "colrev_origin",
+        "colrev_status",
+        "colrev_masterdata_provenance",
+        "colrev_data_provenance",
+        "colrev_pdf_id",
+        "screening_criteria",
+        "file",
+        "prescreen_exclusion",
+        "doi",
+        "grobid_version",
+        "colrev.dblp.dblp_key",
+        "colrev.semantic_scholar.id",
+        "colrev.web_of_science.unique_id",
+        "author",
+        "booktitle",
+        "journal",
+        "title",
+        "year",
+        "volume",
+        "number",
+        "pages",
+        "editor",
+        "publisher",
+        "url",
+        "abstract",
+    ]
+    actual_order = [
+        line.split(" = ", 1)[0].strip() for line in text.splitlines() if " = " in line
+    ]
+    assert actual_order == expected_order
+
+
+def test_bibtex_writer_custom_field_order_appends_unlisted_in_input_order() -> None:
+    records = {
+        "example": {
+            "ENTRYTYPE": "article",
+            "custom_first": "first",
+            "title": "Title",
+            "doi": "10.1234/example",
+            "custom_second": "second",
+            "ID": "example",
+        }
+    }
+
+    text = to_string(records, format="bib", field_order=["doi", "title"])
+
+    actual_order = [
+        line.split(" = ", 1)[0].strip() for line in text.splitlines() if " = " in line
+    ]
+    assert actual_order == ["doi", "title", "custom_first", "custom_second"]
+
+
+def test_file_writer_accepts_custom_field_order(tmp_path: Path) -> None:
+    output = tmp_path / "ordered.bib"
+    write(
+        {
+            "example": {
+                "ENTRYTYPE": "article",
+                "title": "Title",
+                "author": "Author",
+            }
+        },
+        path=output,
+        field_order=["title", "author"],
+    )
+
+    text = output.read_text(encoding="utf-8")
+    actual_order = [
+        line.split(" = ", 1)[0].strip() for line in text.splitlines() if " = " in line
+    ]
+    assert actual_order == ["title", "author"]
+
+
+def test_field_order_is_bibtex_only_and_validated() -> None:
+    records = {"example": {"ENTRYTYPE": "article"}}
+
+    with pytest.raises(UnsupportedFormatError, match="only supported for BibTeX"):
+        to_string(records, format="json", field_order=["title"])
+    with pytest.raises(RecordValidationError, match="iterable of field names"):
+        to_string(records, format="bib", field_order="title")
+    with pytest.raises(RecordValidationError, match="duplicate fields"):
+        to_string(records, format="bib", field_order=["title", "TITLE"])
 
 
 def test_malformed_bibtex_raises_parse_error() -> None:
@@ -99,73 +262,98 @@ def test_malformed_bibtex_raises_parse_error() -> None:
         loads_raw("not a BibTeX entry", format="bib")
 
 
+def test_bibtex_dotted_field_names_are_preserved_when_loading() -> None:
+    text = "@article{example, colrev.vendor.identifier={abc123}}"
+
+    normalized = loads_raw(text, format="bib")
+    un_normalized = loads_raw(text, format="bib", normalize=False)
+
+    assert normalized[0]["colrev.vendor.identifier"] == "abc123"
+    assert un_normalized[0]["colrev.vendor.identifier"] == "abc123"
+    assert "colrev_vendor_identifier" not in normalized[0]
+
+
+def test_bibtex_dotted_field_names_are_preserved_when_writing(tmp_path: Path) -> None:
+    records = {
+        "example": {
+            "ID": "example",
+            "ENTRYTYPE": "article",
+            "colrev.vendor.identifier": "abc123",
+        }
+    }
+
+    text = to_string(records, format="bib", field_order=["colrev.vendor.identifier"])
+    output = tmp_path / "dotted.bib"
+    write(records, path=output, field_order=["colrev.vendor.identifier"])
+
+    assert "colrev.vendor.identifier" in text
+    assert load_raw(output)[0]["colrev.vendor.identifier"] == "abc123"
+
+
 def test_unknown_suffix_raises_unsupported_format(tmp_path: Path) -> None:
     with pytest.raises(UnsupportedFormatError):
         load_raw(tmp_path / "records.unknown")
 
 
-def test_declared_nested_mapping_round_trip() -> None:
-    provenance = {"CURATED": {"source": "github...", "note": ""}}
+def test_declared_provenance_mapping_uses_legacy_format_and_round_trips() -> None:
+    provenance = {
+        "author": {"source": "ebsco_bib.bib/11111111111111111", "note": ""},
+        "title": {"source": "manual.bib/entry1", "note": "checked"},
+    }
     records = {
         "example": {"ENTRYTYPE": "article", "colrev_masterdata_provenance": provenance}
     }
 
-    encoded = to_string(
+    text = to_string(
         records,
         format="bib",
         mapping_fields=["colrev_masterdata_provenance"],
     )
     parsed = loads_raw(
-        encoded,
+        text,
         format="bib",
         mapping_fields=["colrev_masterdata_provenance"],
     )
 
     assert parsed[0]["colrev_masterdata_provenance"] == provenance
-    assert "bibio-json-v1:" in encoded
+    assert (
+        "   colrev_masterdata_provenance  = {author:ebsco_bib.bib/11111111111111111;;\n"
+        "                                    title:manual.bib/entry1;checked;}," in text
+    )
 
 
-def test_declared_nested_lists_round_trip() -> None:
-    value = ["a", [1, True, None], {"nested": ["text", {"empty": []}]}]
+def test_declared_lists_use_semicolon_format_and_round_trip() -> None:
+    value = ["CROSSREF.bib/001792", "DBLP.bib/001703"]
     records = {"example": {"ENTRYTYPE": "misc", "custom_list": value}}
-    encoded = to_string(records, format="bib", list_fields=["custom_list"])
+    text = to_string(records, format="bib", list_fields=["custom_list"])
 
     assert (
-        loads_raw(encoded, format="bib", list_fields=["custom_list"])[0]["custom_list"]
+        loads_raw(text, format="bib", list_fields=["custom_list"])[0]["custom_list"]
         == value
     )
-
-
-@pytest.mark.parametrize("value", [{}, [], {"empty": []}, [{}, []]])
-def test_empty_and_nested_empty_structures_round_trip(value: object) -> None:
-    field = "data"
-    declaration = (
-        {"mapping_fields": [field]}
-        if isinstance(value, dict)
-        else {"list_fields": [field]}
+    assert (
+        f"   {'custom_list':<28}  = {{CROSSREF.bib/001792;\n"
+        "                                    DBLP.bib/001703;}," in text
     )
-    records = {"example": {"ENTRYTYPE": "misc", field: value}}
-    encoded = to_string(records, format="bib", **declaration)
-
-    assert loads_raw(encoded, format="bib", **declaration)[0][field] == value
 
 
-def test_structured_values_escape_arbitrary_text_and_preserve_scalar_types() -> None:
-    value = {
-        'key;=,{}"': [
-            'brace { nested } and "quote"',
-            r"backslash \\ and slash /",
-            "Unicode: café 雪 🧪",
-            False,
-            1,
-            1.25,
-            None,
-        ]
-    }
-    records = {"example": {"ENTRYTYPE": "misc", "data": value}}
-    text = to_string(records, format="bib", mapping_fields=["data"])
+def test_empty_declared_mapping_and_list_round_trip() -> None:
+    records = {"example": {"ENTRYTYPE": "misc", "provenance": {}, "origins": []}}
+    text = to_string(
+        records,
+        format="bib",
+        mapping_fields=["provenance"],
+        list_fields=["origins"],
+    )
 
-    assert loads_raw(text, format="bib", mapping_fields=["data"])[0]["data"] == value
+    parsed = loads_raw(
+        text,
+        format="bib",
+        mapping_fields=["provenance"],
+        list_fields=["origins"],
+    )
+    assert parsed[0]["provenance"] == {}
+    assert parsed[0]["origins"] == []
 
 
 def test_undeclared_structures_keep_writing_error() -> None:
@@ -181,24 +369,31 @@ def test_undeclared_structures_keep_writing_error() -> None:
         to_string(records, format="bib")
 
 
-def test_malformed_declared_structured_value_raises_chained_parse_error() -> None:
-    malformed_values = [
-        "bibio-json-v1:not-base64!",
-        "bibio-json-v1:bm90LWpzb24=",  # valid Base64, invalid JSON
-    ]
-    for value in malformed_values:
-        text = f"@misc{{example, data={{{value}}}}}"
-        with pytest.raises(ParseError, match="Malformed structured value") as error:
-            loads_raw(text, format="bib", mapping_fields=["data"])
-        assert error.value.__cause__ is not None
+def test_malformed_declared_provenance_mapping_raises_parse_error() -> None:
+    text = "@misc{example, provenance={author:source-without-terminator}}"
+    with pytest.raises(ParseError, match="Malformed provenance mapping"):
+        loads_raw(text, format="bib", mapping_fields=["provenance"])
 
 
-def test_declared_field_rejects_wrong_top_level_structured_type() -> None:
+def test_declared_field_rejects_wrong_legacy_container_format() -> None:
     records = {"example": {"ENTRYTYPE": "misc", "data": ["item"]}}
     text = to_string(records, format="bib", list_fields=["data"])
 
-    with pytest.raises(ParseError, match="declared as a mapping field"):
+    with pytest.raises(ParseError, match="Malformed provenance mapping"):
         loads_raw(text, format="bib", mapping_fields=["data"])
+
+
+def test_provenance_mapping_rejects_arbitrary_nested_values() -> None:
+    records = {
+        "example": {
+            "ENTRYTYPE": "misc",
+            "provenance": {
+                "author": {"source": "db", "note": "", "nested": {"x": "y"}}
+            },
+        }
+    }
+    with pytest.raises(SerializationError):
+        to_string(records, format="bib", mapping_fields=["provenance"])
 
 
 def test_structured_option_rejected_for_irrelevant_formats() -> None:
@@ -218,14 +413,30 @@ def test_structured_field_declaration_must_be_unambiguous() -> None:
         )
 
 
-def test_structured_file_api_round_trip(tmp_path: Path) -> None:
-    value = {"CURATED": {"source": "github...", "note": ""}}
-    records = {"example": {"ENTRYTYPE": "article", "provenance": value}}
-    path = tmp_path / "structured.bib"
+def test_raw_file_writer_uses_legacy_mapping_and_list_formats(tmp_path: Path) -> None:
+    provenance = {"CURATED": {"source": "github...", "note": ""}}
+    origins = ["CROSSREF.bib/001792", "DBLP.bib/001703"]
+    records = {
+        "example": {
+            "ENTRYTYPE": "article",
+            "provenance": provenance,
+            "colrev_origin": origins,
+        }
+    }
+    path = tmp_path / "raw.bib"
 
-    write(records, path=path, mapping_fields=["provenance"])
+    write(
+        records,
+        path=path,
+        mapping_fields=["provenance"],
+        list_fields=["colrev_origin"],
+    )
 
-    assert load_raw(path, mapping_fields=["provenance"])[0]["provenance"] == value
+    loaded = load_raw(
+        path, mapping_fields=["provenance"], list_fields=["colrev_origin"]
+    )
+    assert loaded[0]["provenance"] == provenance
+    assert loaded[0]["colrev_origin"] == origins
 
 
 def test_raw_bibtex_preserves_missing_duplicate_and_hash_ids() -> None:

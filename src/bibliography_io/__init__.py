@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +15,7 @@ from .exceptions import ParseError
 from .exceptions import RecordValidationError
 from .exceptions import SerializationError
 from .exceptions import UnsupportedFormatError
+from .normalization import normalize_field_name
 from .normalization import normalize_format
 from .normalization import normalize_records
 
@@ -25,12 +26,17 @@ def write_string(
     *,
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
+    field_order: Any = None,
 ) -> str:
     """Write records to a formatted string using the format-specific writer."""
     from .writers import write_string as dispatch
 
     return dispatch(
-        records, format, mapping_fields=mapping_fields, list_fields=list_fields
+        records,
+        format,
+        mapping_fields=mapping_fields,
+        list_fields=list_fields,
+        field_order=_normalize_field_order(normalize_format(format), field_order),
     )
 
 
@@ -82,6 +88,27 @@ def _structured_fields(
     return mappings, lists
 
 
+def _normalize_field_order(format: str, field_order: Any) -> tuple[str, ...] | None:
+    """Validate and normalize an optional output field order."""
+    if field_order is None:
+        return None
+    if format != "bib":
+        raise UnsupportedFormatError("field_order is only supported for BibTeX")
+    if isinstance(field_order, (str, bytes)) or not isinstance(field_order, Iterable):
+        raise RecordValidationError("field_order must be an iterable of field names")
+    fields = tuple(field_order)
+    if any(not isinstance(field, str) or not field.strip() for field in fields):
+        raise RecordValidationError(
+            "field_order must contain non-empty string field names"
+        )
+    normalized = tuple(
+        normalize_field_name(field, preserve_dots=True) for field in fields
+    )
+    if len(set(normalized)) != len(normalized):
+        raise RecordValidationError("field_order must not contain duplicate fields")
+    return normalized
+
+
 def loads_raw(
     text: str,
     *,
@@ -95,8 +122,8 @@ def loads_raw(
     By default, returns normalized raw data for convenient access. Set
     ``normalize=False`` to retain parser-level values for source-specific
     processing. For BibTeX, ``mapping_fields`` and ``list_fields`` declare
-    fields whose values use bibliography-io's versioned structured-value
-    encoding. Supplying either option for other formats raises
+    provenance mappings and semicolon-delimited list fields. Supplying either
+    option for other formats raises
     :class:`UnsupportedFormatError`. Declared field names match the lowercased
     BibTeX names.
     """
@@ -300,13 +327,18 @@ def to_string(
     format: str,
     mapping_fields: Any = (),
     list_fields: Any = (),
+    field_order: Any = None,
 ) -> str:
     """Return records written as a formatted string.
 
-    For BibTeX, ``mapping_fields`` and ``list_fields`` declare fields to encode
-    as structured values. Supplying either option for other formats raises
+    For BibTeX, ``mapping_fields`` and ``list_fields`` declare provenance
+    mappings and semicolon-delimited list fields. Supplying either option for
+    other formats raises
     :class:`UnsupportedFormatError`. The declared names match the record field
     names (matching is case-insensitive, as BibTeX field names are).
+    ``field_order`` optionally specifies preferred BibTeX field order; fields
+    not listed are appended in their record order. If omitted, a CoLRev-oriented
+    field order is used.
     """
     format_name = normalize_format(format)
     mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
@@ -315,7 +347,11 @@ def to_string(
             "Excel is a file format and cannot be written as a string"
         )
     return write_string(
-        records, format_name, mapping_fields=mappings, list_fields=lists
+        records,
+        format_name,
+        mapping_fields=mappings,
+        list_fields=lists,
+        field_order=_normalize_field_order(format_name, field_order),
     )
 
 
@@ -326,14 +362,19 @@ def write(
     format: str | None = None,
     mapping_fields: Any = (),
     list_fields: Any = (),
+    field_order: Any = None,
     primary: bool = False,
 ) -> None:
     """Write records, replacing existing contents.
 
-    For BibTeX, ``mapping_fields`` and ``list_fields`` declare fields to encode
-    as structured values. Supplying either option for other formats raises
+    For BibTeX, ``mapping_fields`` and ``list_fields`` declare provenance
+    mappings and semicolon-delimited list fields. Supplying either option for
+    other formats raises
     :class:`UnsupportedFormatError`. Set ``primary=True`` to validate an
-    ID-keyed primary-record mapping and restrict output to BibTeX.
+    ID-keyed primary-record mapping, sort records by ID, and restrict output to
+    BibTeX. ``field_order`` optionally sets preferred BibTeX field order;
+    unlisted fields retain their record order. If omitted, a CoLRev-oriented
+    field order is used.
     """
     if not isinstance(primary, bool):
         raise TypeError("primary must be a bool")
@@ -353,7 +394,12 @@ def write(
             raise RecordValidationError("each primary record must be a mapping")
         _index_primary_records(values)
     mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
-    normalized = normalize_records(records)
+    ordered_fields = _normalize_field_order(format_name, field_order)
+    normalized = normalize_records(
+        records, format="bib" if format_name == "bib" else None
+    )
+    if primary:
+        normalized = dict(sorted(normalized.items(), key=lambda item: item[1]["ID"]))
     if format_name == "xlsx":
         try:
             import pandas as pd
@@ -369,7 +415,11 @@ def write(
         output = _markdown_table(normalized)
     else:
         output = write_string(
-            normalized, format_name, mapping_fields=mappings, list_fields=lists
+            normalized,
+            format_name,
+            mapping_fields=mappings,
+            list_fields=lists,
+            field_order=ordered_fields,
         )
     destination.write_text(output, encoding="utf-8")
 

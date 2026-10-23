@@ -2,31 +2,116 @@
 
 from __future__ import annotations
 
-import base64
-import json
 from typing import Any
 
 from ..exceptions import SerializationError
+from ..normalization import normalize_field_name
 
-_STRUCTURED_BIB_PREFIX = "bibio-json-v1:"
+_FIELD_NAME_WIDTH = len("colrev_masterdata_provenance")
+
+_DEFAULT_FIELD_ORDER = (
+    "colrev_origin",
+    "colrev_status",
+    "colrev_masterdata_provenance",
+    "colrev_data_provenance",
+    "colrev_pdf_id",
+    "screening_criteria",
+    "file",
+    "prescreen_exclusion",
+    "doi",
+    "grobid-version",
+    "colrev.dblp.dblp_key",
+    "colrev.semantic_scholar.id",
+    "colrev.web_of_science.unique-id",
+    "author",
+    "booktitle",
+    "journal",
+    "title",
+    "year",
+    "volume",
+    "number",
+    "pages",
+    "editor",
+    "publisher",
+    "url",
+    "abstract",
+)
 
 
-def _escape(value: Any) -> str:
+def _brace_scalar(value: Any) -> str:
     if isinstance(value, (dict, list, tuple, set)):
         raise SerializationError(f"Cannot write non-scalar BibTeX value: {value!r}")
-    return "{" + str(value).replace("}", r"\}") + "}"
-
-
-def _encode_structured(value: Any, field: str) -> str:
-    try:
-        payload = json.dumps(
-            value, ensure_ascii=True, separators=(",", ":"), allow_nan=False
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+    text = str(value)
+    depth, escaped = 0, False
+    for char in text:
+        if not escaped:
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth < 0:
+                    raise SerializationError(
+                        f"Cannot write BibTeX value with unbalanced braces: {value!r}"
+                    )
+        escaped = char == "\\" and not escaped
+        if char != "\\":
+            escaped = False
+    if depth:
         raise SerializationError(
-            f"Cannot write structured BibTeX field {field!r}: {exc}"
-        ) from exc
-    return _STRUCTURED_BIB_PREFIX + base64.b64encode(payload).decode("ascii")
+            f"Cannot write BibTeX value with unbalanced braces: {value!r}"
+        )
+    return "{" + text + "}"
+
+
+def _validate_delimited_text(value: Any, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise SerializationError(
+            f"BibTeX structured field {field!r} must contain only strings"
+        )
+    if any(char in value for char in ";{}\n\r"):
+        raise SerializationError(
+            f"BibTeX structured field {field!r} values contain reserved delimiters"
+        )
+    return value
+
+
+def _encode_mapping(value: dict[str, Any], field: str) -> list[str]:
+    """Serialize provenance as ``field:source;note;`` entries."""
+    entries = []
+    for name, provenance in value.items():
+        if (
+            not isinstance(name, str)
+            or not name
+            or any(char in name for char in ":;{}")
+            or any(char.isspace() for char in name)
+        ):
+            raise SerializationError(
+                f"BibTeX provenance field {field!r} has an invalid key: {name!r}"
+            )
+        if not isinstance(provenance, dict):
+            raise SerializationError(
+                f"BibTeX provenance field {field!r} values must be mappings"
+            )
+        if set(provenance) - {"source", "note"}:
+            raise SerializationError(
+                f"BibTeX provenance field {field!r} supports only 'source' and 'note'"
+            )
+        source = _validate_delimited_text(provenance.get("source"), field=field)
+        note = _validate_delimited_text(provenance.get("note", ""), field=field)
+        entries.append(f"{name}:{source};{note};")
+    return entries
+
+
+def _encode_list(value: list[Any], field: str) -> list[str]:
+    """Serialize list items using the semicolon-delimited BibTeX convention."""
+    return [f"{_validate_delimited_text(item, field=field)};" for item in value]
+
+
+def _braced_lines(prefix: str, values: list[str]) -> str:
+    if not values:
+        return "{}"
+    continuation = " " * (len(prefix) + 1)
+    return "{" + ("\n" + continuation).join(values) + "}"
 
 
 def write_bibtex(
@@ -34,16 +119,29 @@ def write_bibtex(
     *,
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
+    field_order: tuple[str, ...] | None = None,
 ) -> str:
     """Write normalized records as BibTeX."""
+    preferred_fields = (
+        field_order
+        if field_order is not None
+        else tuple(
+            normalize_field_name(field, preserve_dots=True)
+            for field in _DEFAULT_FIELD_ORDER
+        )
+    )
+    field_positions = {field: index for index, field in enumerate(preferred_fields)}
     entries = []
     for record in records.values():
         fields = []
-        field_width = max(
-            (len(key) for key in record if key not in {"ID", "ENTRYTYPE"}),
-            default=0,
+        ordered_fields = sorted(
+            record.items(),
+            key=lambda item: field_positions.get(
+                normalize_field_name(item[0], preserve_dots=True),
+                len(field_positions),
+            ),
         )
-        for key, value in record.items():
+        for key, value in ordered_fields:
             if key in {"ID", "ENTRYTYPE"}:
                 continue
             field_name = key.lower()
@@ -55,10 +153,18 @@ def write_bibtex(
                         f"BibTeX field {key!r} was declared as a {expected_label} "
                         f"field but has value {value!r}"
                     )
-                value = "{" + _encode_structured(value, key) + "}"
+                prefix = f"   {key:<{_FIELD_NAME_WIDTH}}  = "
+                values = (
+                    _encode_mapping(value, key)
+                    if expected_type is dict
+                    else _encode_list(value, key)
+                )
+                value = _braced_lines(prefix, values)
             else:
-                value = _escape(value)
-            fields.append(f"  {key:<{field_width}} = {value}")
+                value = _brace_scalar(value)
+            fields.append(f"   {key:<{_FIELD_NAME_WIDTH}}  = {value}")
+        if fields:
+            fields[-1] += ","
         entries.append(
             f"@{record['ENTRYTYPE']}{{{record['ID']},\n" + ",\n".join(fields) + "\n}"
         )

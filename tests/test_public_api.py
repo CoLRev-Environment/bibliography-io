@@ -182,7 +182,7 @@ def test_primary_dict_writer_validates_ids_and_round_trips_structured_fields(
         "one": {
             "ID": "one",
             "ENTRYTYPE": "article",
-            "provenance": {"source": "database"},
+            "provenance": {"CURATED": {"source": "database", "note": ""}},
         }
     }
     output = tmp_path / "primary.bib"
@@ -204,6 +204,26 @@ def test_primary_dict_writer_validates_ids_and_round_trips_structured_fields(
         write(records, path=tmp_path / "primary.ris", primary=True)
     with pytest.raises(bibio.RecordValidationError, match="mapping of IDs"):
         write([{"ID": "one", "ENTRYTYPE": "article"}], path=output, primary=True)
+
+
+def test_primary_writer_sorts_ids_but_raw_writer_preserves_input_order(
+    tmp_path: Path,
+) -> None:
+    records = {
+        "z-last": {"ID": "z-last", "ENTRYTYPE": "article", "title": "Last"},
+        "a-first": {"ID": "a-first", "ENTRYTYPE": "article", "title": "First"},
+    }
+    primary_path = tmp_path / "primary.bib"
+    raw_path = tmp_path / "raw.bib"
+
+    write(records, path=primary_path, primary=True)
+    write(records, path=raw_path)
+
+    assert list(bibio.load_primary(primary_path)) == ["a-first", "z-last"]
+    assert [record["ID"] for record in load_raw(raw_path)] == ["z-last", "a-first"]
+    assert "   title                         = {Last}," in primary_path.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_write_requires_keyword_path(tmp_path: Path) -> None:
