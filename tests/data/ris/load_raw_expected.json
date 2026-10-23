@@ -1,6 +1,6 @@
 [
   {
-    "ENTRYTYPE": "inproceedings",
+    "TY": "CONF",
     "TI": "Title of a conference paper",
     "T2": "Secondary Title (booktitle title, if applicable)",
     "SP": "183",
@@ -24,7 +24,7 @@
     "PMID": "12345678"
   },
   {
-    "ENTRYTYPE": "article",
+    "TY": "JOUR",
     "PMID": "12345678",
     "ID": "1",
     "TI": "Title of a journal paper",

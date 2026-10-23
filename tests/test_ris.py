@@ -7,6 +7,7 @@ from bibliography_io import to_string
 from bibliography_io import load_raw
 from bibliography_io import loads_raw
 from bibliography_io import write
+from bibliography_io.loaders.ris import load_ris
 
 
 DATA = Path(__file__).parent / "data" / "ris"
@@ -41,6 +42,34 @@ def test_ris_new_type_tag_closes_unterminated_record() -> None:
 
     assert len(records) == 2
     assert [record["title"] for record in records] == ["First", "Second"]
+
+
+def test_ris_type_tag_is_preserved_in_raw_mode(tmp_path: Path) -> None:
+    text = "TY  - CONF\nID  - conf-one\nTI  - Conference paper\nER  -"
+    source = tmp_path / "conference.ris"
+    source.write_text(text, encoding="utf-8")
+
+    raw = load_raw(source, normalize=False)
+    normalized = load_raw(source)
+
+    assert raw == [{"TY": "CONF", "ID": "conf-one", "TI": "Conference paper"}]
+    assert "ENTRYTYPE" not in raw[0]
+    assert normalized == [
+        {
+            "ENTRYTYPE": "inproceedings",
+            "ID": "conf-one",
+            "title": "Conference paper",
+        }
+    ]
+
+
+def test_load_ris_type_tag_modes() -> None:
+    text = "TY  - CONF\nTI  - Conference paper\nER  -"
+
+    assert load_ris(text, normalize=False) == [{"TY": "CONF", "TI": "Conference paper"}]
+    assert load_ris(text, normalize=True) == [
+        {"ENTRYTYPE": "inproceedings", "title": "Conference paper"}
+    ]
 
 
 def test_ris_load_write_round_trip(tmp_path: Path) -> None:

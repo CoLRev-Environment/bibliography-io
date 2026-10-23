@@ -59,7 +59,11 @@ def load_ris(text: str, *, normalize: bool = True) -> list[dict[str, Any]]:
         if tag == "TY":
             if record:
                 parsed.append(record)
-            record = {"ENTRYTYPE": RIS_TYPE.get(value.upper(), "misc")}
+            record = (
+                {"ENTRYTYPE": RIS_TYPE.get(value.upper(), "misc")}
+                if normalize
+                else {"TY": value}
+            )
         elif tag == "ER":
             if record:
                 parsed.append(record)
