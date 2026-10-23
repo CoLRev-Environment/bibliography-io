@@ -8,14 +8,20 @@ File operations infer formats from filename suffixes unless an explicit
 :doc:`usage` for the read/write format matrix, including the distinction
 between core Markdown table output and pending optional reference-list parsing.
 
-.. autofunction:: bibliography_io.load_records
+.. autofunction:: bibliography_io.load_raw
 
-.. autofunction:: bibliography_io.loads
+.. autofunction:: bibliography_io.loads_raw
 
-.. autofunction:: bibliography_io.write_records
+.. autofunction:: bibliography_io.load_primary
 
-.. autofunction:: bibliography_io.dumps
+.. autofunction:: bibliography_io.loads_primary
 
-The historical names ``load``, ``write``, ``write_file``, ``to_string``,
-``load_df``, and ``get_nr_records`` are deprecated immediately. They remain
-available during migration and will be removed in a future release.
+.. autofunction:: bibliography_io.write
+
+.. autofunction:: bibliography_io.to_string
+
+.. autofunction:: bibliography_io.load_raw_df
+
+.. autofunction:: bibliography_io.load_primary_df
+
+.. autofunction:: bibliography_io.get_nr_records

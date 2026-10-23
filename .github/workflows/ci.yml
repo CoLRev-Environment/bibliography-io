@@ -61,19 +61,28 @@ jobs:
           assert not entry_points().select(
               group="bibliography_io.backends", name="markdown"
           )
-          records = bibliography_io.loads(
-              "@article{wheel_smoke, title={Installed wheel}}", format="bib"
-          )
+          bib_text = "@article{wheel_smoke, title={Installed wheel}}"
+          records = bibliography_io.loads_raw(bib_text, format="bib")
           assert len(records) == 1
           assert records[0]["title"] == "Installed wheel"
           with TemporaryDirectory() as directory:
               path = Path(directory) / "smoke.bib"
-              bibliography_io.write_records(records, path=path)
-              assert bibliography_io.load_records(path) == records
+              bibliography_io.write(records, path=path)
+              assert bibliography_io.load_raw(path) == records
+
+              primary_records = bibliography_io.loads_primary(
+                  bib_text, format="bib"
+              )
+              assert list(primary_records) == ["wheel_smoke"]
+              assert primary_records["wheel_smoke"]["title"] == "Installed wheel"
+              primary_path = Path(directory) / "primary.bib"
+              bibliography_io.write(primary_records, path=primary_path, primary=True)
+              assert bibliography_io.load_primary(primary_path) == primary_records
+
               markdown = Path(directory) / "references.md"
               markdown.write_text("# References\n\nA reference", encoding="utf-8")
               try:
-                  bibliography_io.load_records(markdown)
+                  bibliography_io.load_raw(markdown)
               except OptionalBackendUnavailableError:
                   pass
               else:

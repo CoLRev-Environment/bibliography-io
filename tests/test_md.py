@@ -5,9 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from bibliography_io import dumps
-from bibliography_io import load_records
-from bibliography_io import write_records
+from bibliography_io import to_string
+from bibliography_io import load_raw
+from bibliography_io import loads_raw
+from bibliography_io import write
 from bibliography_io.exceptions import OptionalBackendUnavailableError
 
 DATA = Path(__file__).parent / "data" / "md"
@@ -18,17 +19,15 @@ def test_markdown_reference_fixture_requires_optional_backend(
 ) -> None:
     _block_optional_markdown_dependencies(monkeypatch)
     with pytest.raises(OptionalBackendUnavailableError, match=r"\[markdown\]"):
-        load_records(DATA / "load.md")
+        load_raw(DATA / "load.md")
 
 
 def test_markdown_string_requires_optional_backend(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _block_optional_markdown_dependencies(monkeypatch)
-    from bibliography_io import loads
-
     with pytest.raises(OptionalBackendUnavailableError, match=r"\[markdown\]"):
-        loads("A citation", format="md")
+        loads_raw("A citation", format="md")
 
 
 def _block_optional_markdown_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -45,7 +44,7 @@ def _block_optional_markdown_dependencies(monkeypatch: pytest.MonkeyPatch) -> No
 def test_markdown_loader_uses_registered_backend(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from bibliography_io import loads
+    from bibliography_io import loads_raw
     from bibliography_io.loaders import markdown
 
     class FakeBackend:
@@ -69,16 +68,16 @@ def test_markdown_loader_uses_registered_backend(
 
     monkeypatch.setattr(markdown, "entry_points", FakeEntryPoints)
 
-    assert loads("A citation", format="md") == [
+    assert loads_raw("A citation", format="md") == [
         {"ID": "1", "ENTRYTYPE": "article", "title": "Parsed"}
     ]
 
 
 def test_markdown_table_write(tmp_path: Path) -> None:
     records = {"one": {"ID": "one", "ENTRYTYPE": "article", "title": "A | sample"}}
-    text = dumps(records, format="md")
+    text = to_string(records, format="md")
     assert r"A \| sample" in text
 
     output = tmp_path / "table.md"
-    write_records(records, path=output)
+    write(records, path=output)
     assert "| title |" in output.read_text(encoding="utf-8")

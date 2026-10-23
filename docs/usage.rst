@@ -12,32 +12,37 @@ UTF-8 and missing files raise ``FileNotFoundError``.
 
    from pathlib import Path
 
-   from bibliography_io import load_records, write_records
+    from bibliography_io import load_raw, write
 
-   records = load_records(Path("references.bib"))
-   write_records(records, path="references.ris")
+    records = load_raw(Path("references.bib"))
+    write(records, path="references.ris")
 
 String APIs require an explicit ``format``:
 
 .. code-block:: python
 
-   from bibliography_io import dumps, loads
+    from bibliography_io import to_string
+    from bibliography_io import loads_raw
 
-   records = loads("@article{example, title={An example}}", format="bib")
-   bibtex = dumps(records, format="bib")
+    records = loads_raw("@article{example, title={An example}}", format="bib")
+    bibtex = to_string(records, format="bib")
 
 Supported formats
 -----------------
 
-``load_records`` reads BibTeX (``.bib``), RIS (``.ris``), CSV (``.csv``),
+``load_raw`` reads BibTeX (``.bib``), RIS (``.ris``), CSV (``.csv``),
 Excel (``.xls`` and ``.xlsx``), ENL/EndNote (``.enl`` and ``.txt``), NBIB
 (``.nbib``), and JSON (``.json``). It also accepts Markdown (``.md``) for
 reference-list parsing only when the optional backend is installed.
 
-``write_records`` writes BibTeX, RIS, CSV, Excel (``.xlsx``), and Markdown
-tables. JSON, ENL, NBIB, and legacy Excel (``.xls``) are read-only. ``dumps``
+``write`` writes BibTeX, RIS, CSV, Excel (``.xlsx``), and Markdown
+tables. JSON, ENL, NBIB, and legacy Excel (``.xls``) are read-only. ``to_string``
 supports BibTeX, RIS, CSV, and Markdown-table output. Excel is a file-only
-format; ``loads`` supports the string-based input formats.
+format; ``loads_raw`` supports the string-based input formats.
+
+Use ``write(..., primary=True)`` to write a primary-record mapping. This mode
+validates that records have unique, non-empty IDs and valid entry types, and
+only permits BibTeX output.
 
 Format aliases include ``bibtex`` for BibTeX, ``excel`` for Excel, ``endnote``
 for ENL, and ``markdown`` for Markdown. File suffixes are case-insensitive.
@@ -61,16 +66,35 @@ Records are ordered mappings keyed by string ``ID`` values. Each record has
 assigned sequentially without collisions; duplicate IDs raise an error.
 Unknown fields are retained where the output format can represent them.
 
+DataFrame helpers
+-----------------
+
+``load_raw_df()`` returns raw records as DataFrame rows in source order, with a
+default ``RangeIndex``. ``load_primary_df()`` returns primary records with IDs
+as the DataFrame index. Both functions accept the corresponding options from
+``load_raw()`` and ``load_primary()``. Pandas is optional; install the Excel
+extra with ``pip install bibliography-io[excel]`` to use these helpers.
+
+``get_nr_records()`` returns the number of raw records in a file.
+
+.. code-block:: python
+
+    from bibliography_io import load_primary_df
+    from bibliography_io import load_raw_df
+
+    raw = load_raw_df("references.ris")
+    primary = load_primary_df("references.bib")
+
 Loaded records are **raw** in the sense that they have not been curated as
-primary records. ``load_records`` and ``loads`` return **normalized raw data**
+primary records. ``load_raw`` and ``loads_raw`` return **normalized raw data**
 by default, for convenient access and as a fallback representation. Pass
 ``normalize=False`` to access **non-normalized raw data** for maximum control
 or source-specific processing:
 
 .. code-block:: python
 
-   convenient = load_records("references.ris")
-   source_values = load_records("references.ris", normalize=False)
+   convenient = load_raw("references.ris")
+   source_values = load_raw("references.ris", normalize=False)
 
 Normalized raw data uses canonical field names, removes empty repeated values,
 deduplicates exact matches, and represents ordinary fields as strings. Multiple
@@ -91,25 +115,26 @@ are preserved automatically.
 
 .. code-block:: python
 
-   from bibliography_io import dumps, loads
+    from bibliography_io import to_string
+    from bibliography_io import loads_raw
 
-   provenance = {"CURATED": {"source": "github...", "note": ""}}
-   records = {
-       "example": {
-           "ENTRYTYPE": "article",
-           "colrev_masterdata_provenance": provenance,
-       }
-   }
-   text = dumps(
-       records,
-       format="bib",
-       mapping_fields=["colrev_masterdata_provenance"],
-   )
-   restored = loads(
-       text,
-       format="bib",
-       mapping_fields=["colrev_masterdata_provenance"],
-   )
+    provenance = {"CURATED": {"source": "github...", "note": ""}}
+    records = {
+        "example": {
+            "ENTRYTYPE": "article",
+            "colrev_masterdata_provenance": provenance,
+        }
+    }
+    text = to_string(
+        records,
+        format="bib",
+        mapping_fields=["colrev_masterdata_provenance"],
+    )
+    restored = loads_raw(
+        text,
+        format="bib",
+        mapping_fields=["colrev_masterdata_provenance"],
+    )
 
 The file APIs accept the same options. The ``bibio-json-v1:`` encoding uses
 compact JSON encoded as UTF-8 and Base64 inside a standard BibTeX braced value.
@@ -118,10 +143,3 @@ booleans, numbers, nulls, and empty/nested containers. Undeclared mappings and
 lists still raise ``SerializationError``. Structured-field options supplied to
 non-BibTeX formats raise ``UnsupportedFormatError``. See :doc:`design` for the
 full encoding and error contract.
-
-Compatibility aliases
-----------------------
-
-The historical root functions ``load``, ``write``, ``write_file``,
-``to_string``, ``load_df``, and ``get_nr_records`` are deprecated immediately.
-They remain available during migration and will be removed in a future release.

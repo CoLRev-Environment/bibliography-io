@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from bibliography_io import dumps
-from bibliography_io import load_records
-from bibliography_io import loads
-from bibliography_io import write_records
+from bibliography_io import to_string
+from bibliography_io import load_raw
+from bibliography_io import loads_raw
+from bibliography_io import write
 from bibliography_io.exceptions import ParseError
 from bibliography_io.exceptions import RecordValidationError
 from bibliography_io.exceptions import SerializationError
@@ -19,7 +19,7 @@ ORIGINAL_DUPLICATE_FIXTURE = DATA / "load.bib"
 
 
 def test_loading_preserves_duplicate_record_ids() -> None:
-    records = load_records(ORIGINAL_DUPLICATE_FIXTURE)
+    records = load_raw(ORIGINAL_DUPLICATE_FIXTURE)
     repeated = [
         record
         for record in records
@@ -35,8 +35,8 @@ def test_loading_preserves_duplicate_record_ids() -> None:
 
 
 def test_loading_matches_expected_bibtex() -> None:
-    records = load_records(DATA / "load.bib")
-    expected = load_records(DATA / "load_expected.bib")
+    records = load_raw(DATA / "load.bib")
+    expected = load_raw(DATA / "load_expected.bib")
 
     assert len(records) == len(expected)
     for record, expected_record in zip(records, expected):
@@ -56,14 +56,14 @@ def test_loading_matches_expected_bibtex() -> None:
 
 
 def test_unique_id_round_trip_uses_expected_fixtures(tmp_path: Path) -> None:
-    records = load_records(DATA / "write_expected.bib")
+    records = load_raw(DATA / "write_expected.bib")
     expected_text = (DATA / "write_expected.bib").read_text(encoding="utf-8")
-    text = dumps(records, format="bib")
+    text = to_string(records, format="bib")
     output = tmp_path / "written.bib"
-    write_records(records, path=output)
+    write(records, path=output)
 
     assert text.strip() == expected_text.strip()
-    assert load_records(output) == records
+    assert load_raw(output) == records
 
 
 def test_bibtex_writer_aligns_fields_per_entry() -> None:
@@ -81,7 +81,7 @@ def test_bibtex_writer_aligns_fields_per_entry() -> None:
         },
     }
 
-    text = dumps(records, format="bib")
+    text = to_string(records, format="bib")
 
     assert text == (
         "@article{first,\n"
@@ -96,12 +96,12 @@ def test_bibtex_writer_aligns_fields_per_entry() -> None:
 
 def test_malformed_bibtex_raises_parse_error() -> None:
     with pytest.raises(ParseError):
-        loads("not a BibTeX entry", format="bib")
+        loads_raw("not a BibTeX entry", format="bib")
 
 
 def test_unknown_suffix_raises_unsupported_format(tmp_path: Path) -> None:
     with pytest.raises(UnsupportedFormatError):
-        load_records(tmp_path / "records.unknown")
+        load_raw(tmp_path / "records.unknown")
 
 
 def test_declared_nested_mapping_round_trip() -> None:
@@ -110,12 +110,12 @@ def test_declared_nested_mapping_round_trip() -> None:
         "example": {"ENTRYTYPE": "article", "colrev_masterdata_provenance": provenance}
     }
 
-    encoded = dumps(
+    encoded = to_string(
         records,
         format="bib",
         mapping_fields=["colrev_masterdata_provenance"],
     )
-    parsed = loads(
+    parsed = loads_raw(
         encoded,
         format="bib",
         mapping_fields=["colrev_masterdata_provenance"],
@@ -128,10 +128,10 @@ def test_declared_nested_mapping_round_trip() -> None:
 def test_declared_nested_lists_round_trip() -> None:
     value = ["a", [1, True, None], {"nested": ["text", {"empty": []}]}]
     records = {"example": {"ENTRYTYPE": "misc", "custom_list": value}}
-    encoded = dumps(records, format="bib", list_fields=["custom_list"])
+    encoded = to_string(records, format="bib", list_fields=["custom_list"])
 
     assert (
-        loads(encoded, format="bib", list_fields=["custom_list"])[0]["custom_list"]
+        loads_raw(encoded, format="bib", list_fields=["custom_list"])[0]["custom_list"]
         == value
     )
 
@@ -145,9 +145,9 @@ def test_empty_and_nested_empty_structures_round_trip(value: object) -> None:
         else {"list_fields": [field]}
     )
     records = {"example": {"ENTRYTYPE": "misc", field: value}}
-    encoded = dumps(records, format="bib", **declaration)
+    encoded = to_string(records, format="bib", **declaration)
 
-    assert loads(encoded, format="bib", **declaration)[0][field] == value
+    assert loads_raw(encoded, format="bib", **declaration)[0][field] == value
 
 
 def test_structured_values_escape_arbitrary_text_and_preserve_scalar_types() -> None:
@@ -163,9 +163,9 @@ def test_structured_values_escape_arbitrary_text_and_preserve_scalar_types() -> 
         ]
     }
     records = {"example": {"ENTRYTYPE": "misc", "data": value}}
-    text = dumps(records, format="bib", mapping_fields=["data"])
+    text = to_string(records, format="bib", mapping_fields=["data"])
 
-    assert loads(text, format="bib", mapping_fields=["data"])[0]["data"] == value
+    assert loads_raw(text, format="bib", mapping_fields=["data"])[0]["data"] == value
 
 
 def test_undeclared_structures_keep_writing_error() -> None:
@@ -178,7 +178,7 @@ def test_undeclared_structures_keep_writing_error() -> None:
     }
 
     with pytest.raises(SerializationError, match="non-scalar"):
-        dumps(records, format="bib")
+        to_string(records, format="bib")
 
 
 def test_malformed_declared_structured_value_raises_chained_parse_error() -> None:
@@ -189,26 +189,28 @@ def test_malformed_declared_structured_value_raises_chained_parse_error() -> Non
     for value in malformed_values:
         text = f"@misc{{example, data={{{value}}}}}"
         with pytest.raises(ParseError, match="Malformed structured value") as error:
-            loads(text, format="bib", mapping_fields=["data"])
+            loads_raw(text, format="bib", mapping_fields=["data"])
         assert error.value.__cause__ is not None
 
 
 def test_declared_field_rejects_wrong_top_level_structured_type() -> None:
     records = {"example": {"ENTRYTYPE": "misc", "data": ["item"]}}
-    text = dumps(records, format="bib", list_fields=["data"])
+    text = to_string(records, format="bib", list_fields=["data"])
 
     with pytest.raises(ParseError, match="declared as a mapping field"):
-        loads(text, format="bib", mapping_fields=["data"])
+        loads_raw(text, format="bib", mapping_fields=["data"])
 
 
 def test_structured_option_rejected_for_irrelevant_formats() -> None:
     with pytest.raises(UnsupportedFormatError, match="only supported for BibTeX"):
-        dumps({"example": {"ENTRYTYPE": "misc"}}, format="json", list_fields=["data"])
+        to_string(
+            {"example": {"ENTRYTYPE": "misc"}}, format="json", list_fields=["data"]
+        )
 
 
 def test_structured_field_declaration_must_be_unambiguous() -> None:
     with pytest.raises(RecordValidationError, match="both mappings and lists"):
-        dumps(
+        to_string(
             {"example": {"ENTRYTYPE": "misc"}},
             format="bib",
             mapping_fields=["data"],
@@ -221,16 +223,16 @@ def test_structured_file_api_round_trip(tmp_path: Path) -> None:
     records = {"example": {"ENTRYTYPE": "article", "provenance": value}}
     path = tmp_path / "structured.bib"
 
-    write_records(records, path=path, mapping_fields=["provenance"])
+    write(records, path=path, mapping_fields=["provenance"])
 
-    assert load_records(path, mapping_fields=["provenance"])[0]["provenance"] == value
+    assert load_raw(path, mapping_fields=["provenance"])[0]["provenance"] == value
 
 
 def test_raw_bibtex_preserves_missing_duplicate_and_hash_ids() -> None:
-    records = loads(
+    records = loads_raw(
         "@article{same#key, title={First}}\n@article{same#key, title={Second}}",
         format="bib",
     )
     assert [record.get("ID") for record in records] == ["same#key", "same#key"]
     assert [record["title"] for record in records] == ["First", "Second"]
-    assert loads('[{"title": "No ID"}]', format="json")[0].get("ID") is None
+    assert loads_raw('[{"title": "No ID"}]', format="json")[0].get("ID") is None

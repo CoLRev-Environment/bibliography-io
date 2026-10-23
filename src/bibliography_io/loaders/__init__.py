@@ -20,6 +20,7 @@ def load_string(
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
     source: str | Path = "<string>",
+    header_only: bool = False,
 ) -> list[dict[str, Any]]:
     """Load records from a string by dispatching to the format-specific loader."""
     try:
@@ -31,6 +32,7 @@ def load_string(
                 mapping_fields=mapping_fields,
                 list_fields=list_fields,
                 normalize=normalize,
+                header_only=header_only,
             )
         elif format == "ris":
             from .ris import load_ris

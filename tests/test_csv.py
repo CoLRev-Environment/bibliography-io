@@ -3,17 +3,17 @@
 import json
 from pathlib import Path
 
-from bibliography_io import dumps
-from bibliography_io import load_records
-from bibliography_io import loads
-from bibliography_io import write_records
+from bibliography_io import to_string
+from bibliography_io import load_raw
+from bibliography_io import loads_raw
+from bibliography_io import write
 
 
 DATA = Path(__file__).parent / "data" / "csv"
 
 
 def test_load_csv_fixture() -> None:
-    records = load_records(DATA / "load.csv")
+    records = load_raw(DATA / "load.csv")
     expected = json.loads((DATA / "load_expected.json").read_text(encoding="utf-8"))
     assert len(records) == len(expected) == 2
     assert records == expected
@@ -30,23 +30,23 @@ def test_load_csv_fixture() -> None:
 
 
 def test_csv_load_write_round_trip(tmp_path: Path) -> None:
-    records = load_records(DATA / "write_expected.bib")
-    text = dumps(records, format="csv")
+    records = load_raw(DATA / "write_expected.bib")
+    text = to_string(records, format="csv")
     output = tmp_path / "roundtrip.csv"
-    write_records(records, path=output)
+    write(records, path=output)
 
-    assert len(loads(text, format="csv")) == len(records)
-    assert len(load_records(output)) == len(records)
+    assert len(loads_raw(text, format="csv")) == len(records)
+    assert len(load_raw(output)) == len(records)
     assert output.read_text(encoding="utf-8") == (
         DATA / "write_expected.csv"
     ).read_text(encoding="utf-8")
 
 
 def test_csv_fixture_writes_and_reloads(tmp_path: Path) -> None:
-    records = load_records(DATA / "load.csv")
+    records = load_raw(DATA / "load.csv")
     output = tmp_path / "fixture-roundtrip.csv"
-    write_records(records, path=output)
-    written = load_records(output)
+    write(records, path=output)
+    written = load_raw(output)
     assert len(written) == len(records)
     for before, after in zip(records, written):
         for field in ("pmid", "title", "author", "year", "doi", "pmcid"):

@@ -2,17 +2,17 @@
 
 from pathlib import Path
 
-from bibliography_io import dumps
-from bibliography_io import load_records
-from bibliography_io import write_records
+from bibliography_io import to_string
+from bibliography_io import load_raw
+from bibliography_io import write
 
 
 DATA = Path(__file__).parent / "data" / "enl"
 
 
 def test_load_enl_fixture() -> None:
-    records = load_records(DATA / "load.enl")
-    expected = load_records(DATA / "load_expected.bib")
+    records = load_raw(DATA / "load.enl")
+    expected = load_raw(DATA / "load_expected.bib")
 
     assert len(records) == 3
     assert len(expected) == 1
@@ -43,10 +43,10 @@ def test_load_enl_fixture() -> None:
 
 
 def test_enl_records_write_to_bibtex(tmp_path: Path) -> None:
-    records = load_records(DATA / "load_expected.bib")
-    text = dumps(records, format="bib")
+    records = load_raw(DATA / "load_expected.bib")
+    text = to_string(records, format="bib")
     output = tmp_path / "from-enl.bib"
-    write_records(records, path=output)
+    write(records, path=output)
 
-    assert text.strip() == dumps(records, format="bib").strip()
-    assert load_records(output) == records
+    assert text.strip() == to_string(records, format="bib").strip()
+    assert load_raw(output) == records

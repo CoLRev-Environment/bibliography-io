@@ -41,11 +41,11 @@ tags:
 
 .. code-block:: python
 
-   load_records(
+   load_raw(
        path, *, format=None, source=None, source_version=None,
        standardize_field_names=True
    ) -> list[dict]
-   loads(
+   loads_raw(
        string, *, format=..., source=None, source_version=None,
        standardize_field_names=True
    ) -> list[dict]
@@ -54,13 +54,12 @@ The corresponding writing interfaces are:
 
 .. code-block:: python
 
-   write_records(
-       records, *, path, format=None, source=None, source_version=None,
-       standardize_field_names=True
+   write(
+       records, *, path, format=None, mapping_fields=(), list_fields=(),
+       primary=False
    ) -> None
-   dumps(
-       records, *, format=..., source=None, source_version=None,
-       standardize_field_names=True
+   to_string(
+       records, *, format, mapping_fields=(), list_fields=()
    ) -> str
 
 The raw API follows these principles:
@@ -118,11 +117,11 @@ Source-specific parsing
 Separately installable source-specific packages extend bibliography-io as
 plugins registered through the plugin infrastructure. The core owns and
 orchestrates loading; a source plugin supplies hooks that run at defined points
-in that pipeline. Conceptually, ``load_records()`` follows this sequence:
+in that pipeline. Conceptually, ``load_raw()`` follows this sequence:
 
 .. code-block:: python
 
-   def load_records(path, *, format=None, source=None, source_version=None):
+   def load_raw(path, *, format=None, source=None, source_version=None):
         string, resolved_format = read_input(path, format=format)
        plugin = get_source_plugin(source) if source else None
 
@@ -147,8 +146,8 @@ in that pipeline. Conceptually, ``load_records()`` follows this sequence:
 ``normalize_basic()``, and ``validate_records()`` represent core stages. The
 plugin's ``preprocess()`` hook can adapt source-specific input strings before
 parsing. ``postprocess()`` receives parsed, basically normalized records for
-source-specific transformations. The same stages apply to ``loads()`` after its
-input string and required format have been validated. With no source specified,
+source-specific transformations. The same stages apply to ``loads_raw()`` after
+its input string and required format have been validated. With no source specified,
 the core uses its generic format handling and skips the plugin hooks.
 
 Source- and version-specific field-name mappings supplied by a plugin
@@ -167,8 +166,8 @@ selects its source in the core API, for example:
 .. code-block:: python
 
    # provider_x_bibliography/__init__.py
-   def load_records(path, *, format=None, source_version=None):
-       return bibliography_io.load_records(
+   def load_raw(path, *, format=None, source_version=None):
+       return bibliography_io.load_raw(
            path,
            format=format,
            source="provider_x",
@@ -176,7 +175,7 @@ selects its source in the core API, for example:
        )
 
 Both entry points use the core's orchestrated pipeline. The plugin hook
-implementation must not call the source-dispatching ``load_records()`` with the
+implementation must not call the source-dispatching ``load_raw()`` with the
 same source, which would dispatch back to that plugin. With no source specified,
 the matching source plugin is not used. A requested source plugin that is
 unavailable raises ``OptionalBackendUnavailableError``; an unsupported
@@ -192,31 +191,33 @@ The primary-data interfaces are:
 
 .. code-block:: python
 
-   load_records_dict(
-       path, *, header_only=False, mapping_fields=(), list_fields=()
+   load_primary(
+       path, *, format=None, header_only=False, mapping_fields=(), list_fields=()
    ) -> dict[str, dict]
 
-   loads_dict(
-       text, *, mapping_fields=(), list_fields=()
+   loads_primary(
+       text, *, format=..., mapping_fields=(), list_fields=()
    ) -> dict[str, dict]
 
-    write_records(
-        records, *, path, format=None, mapping_fields=(), list_fields=()
-    ) -> None
+   write(
+       records, *, path, format=None, primary=True,
+       mapping_fields=(), list_fields=()
+   ) -> None
 
 The primary-data API follows these principles:
 
-- These interfaces always read or write BibTeX and do not accept a general
-  format argument.
+- Primary loaders accept supported input formats and return records indexed by
+  ID. Pass ``primary=True`` to ``write()`` to validate primary records and
+  restrict writing to BibTeX.
 - Loads return an ID-indexed dictionary. Every record must have a valid, unique
   string ``ID``; missing and duplicate IDs raise ``MissingRecordIDError`` and
   ``DuplicateRecordIDError``, respectively. The API does not generate IDs or
   silently overwrite duplicate records. ID assignment and validation belong to
   the caller's ingestion or promotion process.
-- Use ``loads_dict()`` to load Git-versioned BibTeX supplied as text, such as
+- Use ``loads_primary()`` to load versioned bibliography supplied as text, such as
   content read from a particular Git revision. It parses the text and returns
   records indexed by ID.
-- ``load_records_dict(header_only=True)`` is a performance-oriented option for
+- ``load_primary(header_only=True)`` is a performance-oriented option for
   workflows that need only record headers. It returns the same ID-indexed
   dictionary shape with only ``ID`` and ``ENTRYTYPE`` in each record; the default
   ``False`` returns complete records.
@@ -340,10 +341,7 @@ CoLRev adapter behavior, not core API options. The legacy ``format_names`` optio
 has been removed. CoLRev's adapter is responsible for callback ordering and
 legacy missing-file defaults. Historical ``colrev.loader.*`` and
 ``colrev.writer.*`` imports remain CoLRev compatibility facades during migration;
-they are not bibliography-io public module paths. The package's old root aliases
-(``load``, ``write``, ``write_file``, ``to_string``, ``load_df``, and ``get_nr_records``)
-are deprecated immediately. They remain available during migration and will
-be removed in a future release.
+they are not bibliography-io public module paths.
 
 The legacy processing modules ``load_utils_formatter.py`` and
 ``load_utils_name_formatter.py`` contain CoLRev-specific formatting and name
@@ -352,7 +350,6 @@ packages, not maintained as bibliography-io functionality. In particular,
 language-code interpretation and normalization belong in CoLRev packages.
 
 The legacy ``bibliography_io.loader.load_utils`` adapter has been removed.
-Callers should use ``load_records()`` or ``loads()`` for raw list-based parsing;
+Callers should use ``load_raw()`` or ``loads_raw()`` for raw list-based parsing;
 CoLRev-specific callbacks, ID assignment, missing-file defaults, and workflow
-processing belong in CoLRev packages. The deprecated root-level ``load()`` alias
-continues to delegate to ``load_records()`` but rejects CoLRev-specific options.
+processing belong in CoLRev packages.

@@ -37,32 +37,33 @@ formats do not require either extra.
 ## Usage
 
 ```python
-from bibliography_io import load_records, write_records
+from bibliography_io import load_raw, write
 
-records = load_records("references.bib")
-write_records(records, path="references.ris")
+records = load_raw("references.bib")
+write(records, path="references.ris")
 ```
 
 File APIs infer the format from recognized suffixes; an explicit `format` can
 override inference. String APIs always require `format`:
 
 ```python
-from bibliography_io import dumps, loads
+from bibliography_io import to_string
+from bibliography_io import loads_raw
 
-records = loads("@article{example, title={An example}}", format="bib")
-text = dumps(records, format="bib")
+records = loads_raw("@article{example, title={An example}}", format="bib")
+text = to_string(records, format="bib")
 ```
 
 ### Format support
 
 | Format | Read files | Write files | String APIs |
 | --- | --- | --- | --- |
-| BibTeX (`.bib`) | Yes | Yes | `loads` / `dumps` |
-| RIS (`.ris`) | Yes | Yes | `loads` / `dumps` |
-| ENL / EndNote (`.enl`) | Yes | *Planned* | `loads` (`dumps` planned) |
-| NBIB (`.nbib`) | Yes | *Planned* | `loads` (`dumps` planned) |
-| JSON (`.json`) | Yes | *Planned* | `loads` (`dumps` planned) |
-| CSV (`.csv`) | Yes | Yes | `loads` / `dumps` |
+| BibTeX (`.bib`) | Yes | Yes | `loads` / `to_string` |
+| RIS (`.ris`) | Yes | Yes | `loads` / `to_string` |
+| ENL / EndNote (`.enl`) | Yes | *Planned* | `loads` (`to_string` planned) |
+| NBIB (`.nbib`) | Yes | *Planned* | `loads` (`to_string` planned) |
+| JSON (`.json`) | Yes | *Planned* | `loads` (`to_string` planned) |
+| CSV (`.csv`) | Yes | Yes | `loads` / `to_string` |
 | Excel (`.xls`, `.xlsx`) | Yes | Yes | File APIs only |
 | Markdown (`.md`) | *Planned* | *Planned* | *Planned* |
 

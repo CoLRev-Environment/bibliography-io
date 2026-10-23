@@ -30,20 +30,21 @@ Quick example
 
 .. code-block:: python
 
-   from bibliography_io import load_records, write_records
+   from bibliography_io import load_raw, write
 
-   records = load_records("references.bib")
-   write_records(records, path="references.ris")
+   records = load_raw("references.bib")
+   write(records, path="references.ris")
 
 File APIs infer formats from recognized filename suffixes. String APIs require
 an explicit format:
 
 .. code-block:: python
 
-   from bibliography_io import dumps, loads
+    from bibliography_io import to_string
+    from bibliography_io import loads_raw
 
-   records = loads("@article{example, title={An example}}", format="bib")
-   bibtex = dumps(records, format="bib")
+    records = loads_raw("@article{example, title={An example}}", format="bib")
+    bibtex = to_string(records, format="bib")
 
 See :doc:`usage` for supported formats, :doc:`api` for the public interface,
 and :doc:`design` for the standalone API and compatibility contract.

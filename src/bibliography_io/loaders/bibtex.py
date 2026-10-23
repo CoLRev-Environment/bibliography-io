@@ -45,8 +45,9 @@ def load_bibtex(
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
     normalize: bool = True,
+    header_only: bool = False,
 ) -> list[dict[str, Any]]:
-    """Load BibTeX entries, including explicitly declared structured fields."""
+    """Load BibTeX entries, optionally extracting only their headers."""
     parsed = []
     for entry in re.finditer(r"@([\w-]+)\s*[{(]\s*([^,\s]+)\s*,", text):
         start = entry.end()
@@ -76,44 +77,45 @@ def load_bibtex(
             if char != "\\":
                 escaped = False
             end += 1
-        body = text[start:end]
         record: dict[str, Any] = {
             "ID": entry.group(2),
             "ENTRYTYPE": entry.group(1).lower(),
         }
-        for field in re.finditer(
-            r'([\w-]+)\s*=\s*(\{(?:[^{}]|\{[^{}]*\})*\}|"(?:[^"]|\\.)*"|[^,\s]+)\s*,?',
-            body,
-            re.DOTALL,
-        ):
-            raw_value = field.group(2).strip()
-            value = raw_value
-            if (value.startswith("{") and value.endswith("}")) or (
-                value.startswith('"') and value.endswith('"')
+        if not header_only:
+            body = text[start:end]
+            for field in re.finditer(
+                r'([\w-]+)\s*=\s*(\{(?:[^{}]|\{[^{}]*\})*\}|"(?:[^"]|\\.)*"|[^,\s]+)\s*,?',
+                body,
+                re.DOTALL,
             ):
-                value = value[1:-1]
-            field_name = field.group(1).lower()
-            value = value.strip()
-            if field_name in mapping_fields | list_fields:
-                if not raw_value.startswith("{"):
-                    raise ParseError(
-                        f"Structured BibTeX field {field_name!r} must use a braced value"
-                    )
-                value = value.lstrip("{").rstrip("}")
-                prefix_index = value.find(_STRUCTURED_BIB_PREFIX)
-                if prefix_index >= 0:
-                    value = value[prefix_index:]
-                decoded = _decode_structured_value(value, field_name)
-                expected_type = dict if field_name in mapping_fields else list
-                expected_label = "mapping" if expected_type is dict else "list"
-                if not isinstance(decoded, expected_type):
-                    raise ParseError(
-                        f"Structured BibTeX field {field_name!r} was declared as a "
-                        f"{expected_label} field but does not decode to a {expected_label}"
-                    )
-                record[field_name] = decoded
-            else:
-                record[field_name] = value
+                raw_value = field.group(2).strip()
+                value = raw_value
+                if (value.startswith("{") and value.endswith("}")) or (
+                    value.startswith('"') and value.endswith('"')
+                ):
+                    value = value[1:-1]
+                field_name = field.group(1).lower()
+                value = value.strip()
+                if field_name in mapping_fields | list_fields:
+                    if not raw_value.startswith("{"):
+                        raise ParseError(
+                            f"Structured BibTeX field {field_name!r} must use a braced value"
+                        )
+                    value = value.lstrip("{").rstrip("}")
+                    prefix_index = value.find(_STRUCTURED_BIB_PREFIX)
+                    if prefix_index >= 0:
+                        value = value[prefix_index:]
+                    decoded = _decode_structured_value(value, field_name)
+                    expected_type = dict if field_name in mapping_fields else list
+                    expected_label = "mapping" if expected_type is dict else "list"
+                    if not isinstance(decoded, expected_type):
+                        raise ParseError(
+                            f"Structured BibTeX field {field_name!r} was declared as a "
+                            f"{expected_label} field but does not decode to a {expected_label}"
+                        )
+                    record[field_name] = decoded
+                else:
+                    record[field_name] = value
         parsed.append(
             normalize_source_record(
                 record, format="bib", field_aliases=BIBTEX_FIELD_ALIASES

@@ -1,6 +1,6 @@
 """Tests for source-specific field normalization."""
 
-from bibliography_io import loads
+from bibliography_io import loads_raw
 from bibliography_io.normalization import normalize_field_name
 from bibliography_io.normalization import normalize_records
 from bibliography_io.normalization import normalize_source_record
@@ -31,8 +31,8 @@ def test_normalize_records_accepts_explicit_field_aliases() -> None:
 
 
 def test_loaders_apply_their_own_field_aliases() -> None:
-    bibtex = loads("@article{sample, journaltitle={Journal}}", format="bib")
-    ris = loads("TY  - JOUR\nT1  - Title\nER  -", format="ris")
+    bibtex = loads_raw("@article{sample, journaltitle={Journal}}", format="bib")
+    ris = loads_raw("TY  - JOUR\nT1  - Title\nER  -", format="ris")
 
     assert bibtex[0]["journal"] == "Journal"
     assert ris[0]["title"] == "Title"
@@ -52,7 +52,7 @@ def test_json_load_normalizes_multivalued_fields_by_default() -> None:
       }
     ]"""
 
-    assert loads(text, format="json") == [
+    assert loads_raw(text, format="json") == [
         {
             "ENTRYTYPE": "article",
             "ID": "sample",
@@ -68,7 +68,7 @@ def test_json_load_normalizes_multivalued_fields_by_default() -> None:
 def test_non_normalized_json_preserves_source_values() -> None:
     text = '[{"ENTRYTYPE":"article","authors":["Ada","Grace"],"volume":["4","4"]}]'
 
-    assert loads(text, format="json", normalize=False) == [
+    assert loads_raw(text, format="json", normalize=False) == [
         {
             "ENTRYTYPE": "article",
             "authors": ["Ada", "Grace"],

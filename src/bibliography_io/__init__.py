@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import warnings
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -82,7 +82,7 @@ def _structured_fields(
     return mappings, lists
 
 
-def loads(
+def loads_raw(
     text: str,
     *,
     format: str,
@@ -116,7 +116,7 @@ def loads(
     )
 
 
-def load_records(
+def load_raw(
     path: str | Path,
     *,
     format: str | None = None,
@@ -160,7 +160,141 @@ def load_records(
     )
 
 
-def dumps(
+def _index_primary_records(
+    records: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Validate primary record headers and index records by their IDs."""
+    indexed: dict[str, dict[str, Any]] = {}
+    for record in records:
+        record_id = record.get("ID")
+        if not isinstance(record_id, str) or not record_id.strip():
+            raise MissingRecordIDError("Primary records require a non-empty string ID")
+        if record_id in indexed:
+            raise DuplicateRecordIDError(f"Duplicate record ID: {record_id}")
+        entrytype = record.get("ENTRYTYPE")
+        if not isinstance(entrytype, str) or not entrytype.strip():
+            raise RecordValidationError(
+                f"record {record_id!r} has an invalid ENTRYTYPE"
+            )
+        indexed[record_id] = record
+    return indexed
+
+
+def loads_primary(
+    text: str,
+    *,
+    format: str,
+    mapping_fields: Any = (),
+    list_fields: Any = (),
+) -> dict[str, dict[str, Any]]:
+    """Load primary records from a string as an ID-indexed dictionary."""
+    records = loads_raw(
+        text,
+        format=format,
+        mapping_fields=mapping_fields,
+        list_fields=list_fields,
+    )
+    return _index_primary_records(records)
+
+
+def load_primary(
+    path: str | Path,
+    *,
+    format: str | None = None,
+    header_only: bool = False,
+    mapping_fields: Any = (),
+    list_fields: Any = (),
+) -> dict[str, dict[str, Any]]:
+    """Load primary records from a file as an ID-indexed dictionary."""
+    if not isinstance(header_only, bool):
+        raise TypeError("header_only must be a bool")
+    source = Path(path)
+    format_name = _format_from_path(source, format)
+    if not source.is_file():
+        raise FileNotFoundError(source)
+    mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
+    if header_only and format_name != "bib":
+        raise UnsupportedFormatError("header_only is only supported for BibTeX")
+    if header_only:
+        string = source.read_text(encoding="utf-8-sig")
+        from .loaders import load_string
+
+        records = load_string(
+            string,
+            format_name,
+            mapping_fields=mappings,
+            list_fields=lists,
+            source=source,
+            header_only=True,
+        )
+    else:
+        records = load_raw(
+            source,
+            format=format_name,
+            mapping_fields=mappings,
+            list_fields=lists,
+        )
+    return _index_primary_records(records)
+
+
+def _load_pandas() -> Any:
+    """Import the optional DataFrame backend."""
+    try:
+        import pandas as pd
+    except ImportError as exc:
+        raise OptionalBackendUnavailableError(
+            "Loading records as DataFrames requires pandas. Install it with "
+            "'pip install bibliography-io[excel]'."
+        ) from exc
+    return pd
+
+
+def load_raw_df(
+    path: str | Path,
+    *,
+    format: str | None = None,
+    normalize: bool = True,
+    mapping_fields: Any = (),
+    list_fields: Any = (),
+) -> Any:
+    """Load raw records into a DataFrame, preserving source order as rows."""
+    records = load_raw(
+        path,
+        format=format,
+        normalize=normalize,
+        mapping_fields=mapping_fields,
+        list_fields=list_fields,
+    )
+    pd = _load_pandas()
+    return pd.DataFrame(records)
+
+
+def load_primary_df(
+    path: str | Path,
+    *,
+    format: str | None = None,
+    header_only: bool = False,
+    mapping_fields: Any = (),
+    list_fields: Any = (),
+) -> Any:
+    """Load primary records into a DataFrame indexed by record ID."""
+    records = load_primary(
+        path,
+        format=format,
+        header_only=header_only,
+        mapping_fields=mapping_fields,
+        list_fields=list_fields,
+    )
+    pd = _load_pandas()
+    return pd.DataFrame.from_dict(records, orient="index")
+
+
+def get_nr_records(filename: str | Path) -> int:
+    """Return the number of raw records in a file."""
+    return len(load_raw(filename))
+
+
+def to_string(
     records: Any,
     *,
     format: str,
@@ -185,22 +319,39 @@ def dumps(
     )
 
 
-def write_records(
+def write(
     records: Any,
     *,
     path: str | Path,
     format: str | None = None,
     mapping_fields: Any = (),
     list_fields: Any = (),
+    primary: bool = False,
 ) -> None:
     """Write records, replacing existing contents.
 
     For BibTeX, ``mapping_fields`` and ``list_fields`` declare fields to encode
     as structured values. Supplying either option for other formats raises
-    :class:`UnsupportedFormatError`.
+    :class:`UnsupportedFormatError`. Set ``primary=True`` to validate an
+    ID-keyed primary-record mapping and restrict output to BibTeX.
     """
+    if not isinstance(primary, bool):
+        raise TypeError("primary must be a bool")
     destination = Path(path)
     format_name = _format_from_path(destination, format)
+    if primary:
+        if format_name != "bib":
+            raise UnsupportedFormatError(
+                "Primary records can only be written as BibTeX"
+            )
+        if not isinstance(records, Mapping):
+            raise RecordValidationError(
+                "primary records must be a mapping of IDs to records"
+            )
+        values = list(records.values())
+        if any(not isinstance(record, dict) for record in values):
+            raise RecordValidationError("each primary record must be a mapping")
+        _index_primary_records(values)
     mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
     normalized = normalize_records(records)
     if format_name == "xlsx":
@@ -240,83 +391,6 @@ def _markdown_table(records: dict[str, dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _deprecated(name: str) -> None:
-    warnings.warn(
-        f"bibliography_io.{name} is deprecated; use the strict core API instead.",
-        DeprecationWarning,
-        stacklevel=3,
-    )
-
-
-def load(path: str | Path | None = None, **kwargs: Any) -> list[dict[str, Any]]:
-    """Deprecated alias for :func:`load_records` without legacy CoLRev options."""
-    _deprecated("load")
-    if path is None:
-        path = kwargs.pop("filename", None)
-    if path is None:
-        raise TypeError("load() requires a path")
-    legacy_options = {
-        "entrytype_setter",
-        "field_mapper",
-        "id_labeler",
-        "unique_id_field",
-        "logger",
-        "empty_if_file_not_exists",
-        "format_names",
-    }
-    unsupported = legacy_options & kwargs.keys()
-    if unsupported:
-        raise TypeError(
-            "CoLRev-specific load options are no longer supported by "
-            f"bibliography_io.load(): {', '.join(sorted(unsupported))}"
-        )
-    return load_records(path, **kwargs)
-
-
-def write(records: Any, path: str | Path | None = None, **kwargs: Any) -> None:
-    """Deprecated alias for :func:`write_records`."""
-    _deprecated("write")
-    if path is None and "filename" in kwargs:
-        path = kwargs.pop("filename")
-    if path is None:
-        raise TypeError("write() requires a path")
-    if kwargs:
-        raise TypeError(f"Unexpected legacy write options: {', '.join(kwargs)}")
-    write_records(records, path=path)
-
-
-def write_file(records: Any, path: str | Path | None = None, **kwargs: Any) -> None:
-    """Deprecated alias for :func:`write_records`."""
-    _deprecated("write_file")
-    if path is None:
-        path = kwargs.pop("filename", None)
-    if path is None or kwargs:
-        raise TypeError("write_file() requires only records and path")
-    write_records(records, path=path)
-
-
-def to_string(*, records_dict: Any, implementation: str, **kwargs: Any) -> str:
-    """Deprecated alias for :func:`dumps`."""
-    _deprecated("to_string")
-    if kwargs:
-        raise TypeError(f"Unexpected legacy options: {', '.join(kwargs)}")
-    return dumps(records_dict, format=implementation)
-
-
-def load_df(filename: str | Path):
-    """Deprecated convenience function returning a pandas DataFrame."""
-    _deprecated("load_df")
-    import pandas as pd
-
-    return pd.DataFrame.from_dict(load_records(filename), orient="index")
-
-
-def get_nr_records(filename: str | Path) -> int:
-    """Deprecated convenience function counting records in a file."""
-    _deprecated("get_nr_records")
-    return len(load_records(filename))
-
-
 __all__ = [
     "BackendExecutionError",
     "BibliographyIOError",
@@ -327,8 +401,13 @@ __all__ = [
     "RecordValidationError",
     "SerializationError",
     "UnsupportedFormatError",
-    "dumps",
-    "load_records",
-    "loads",
-    "write_records",
+    "get_nr_records",
+    "load_primary",
+    "load_primary_df",
+    "load_raw",
+    "load_raw_df",
+    "loads_primary",
+    "loads_raw",
+    "to_string",
+    "write",
 ]
