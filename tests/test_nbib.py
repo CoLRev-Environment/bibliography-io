@@ -5,6 +5,7 @@ from pathlib import Path
 
 from bibliography_io import to_string
 from bibliography_io import load_raw
+from bibliography_io import loads_raw
 from bibliography_io import write
 
 
@@ -26,6 +27,32 @@ def test_load_nbib_non_normalized_retains_source_tags() -> None:
     assert records[0]["OT"] == ["Keyword 1", "Keyword 2", "Keyword 3"]
     assert records[0]["DP"] == "2000"
     assert records[0]["PMID"] == "12345678"
+
+
+def test_nbib_repeated_publication_types_are_preserved() -> None:
+    records = loads_raw(
+        "PT  - Journal Articles\nPT  - Reports - Research\n",
+        format="nbib",
+        normalize=False,
+    )
+
+    assert records[0]["PT"] == ["Journal Articles", "Reports - Research"]
+
+
+def test_nbib_single_publication_type_remains_a_scalar() -> None:
+    records = loads_raw(
+        "PT  - Journal Articles\n", format="nbib", normalize=False
+    )
+
+    assert records[0]["PT"] == "Journal Articles"
+
+
+def test_nbib_repeated_normalized_publication_types_are_preserved() -> None:
+    records = loads_raw(
+        "PT  - Journal Articles\nPT  - Reports - Research\n", format="nbib"
+    )
+
+    assert records[0]["type"] == "journal_articles; reports_research"
 
 
 def test_nbib_load_write_as_bibtex(tmp_path: Path) -> None:

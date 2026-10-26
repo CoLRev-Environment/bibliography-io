@@ -39,9 +39,14 @@ def load_tagged(
                 elif tag == "PMID":
                     current["pmid" if normalize else tag] = value
                 elif tag == "PT":
-                    current["type" if normalize else "PT"] = (
-                        normalize_field_name(value) if normalize else value
-                    )
+                    key = "type" if normalize else "PT"
+                    parsed_value = normalize_field_name(value) if normalize else value
+                    if key not in current:
+                        current[key] = parsed_value
+                    elif isinstance(current[key], list):
+                        current[key].append(parsed_value)
+                    else:
+                        current[key] = [current[key], parsed_value]
                 else:
                     key = (
                         {
