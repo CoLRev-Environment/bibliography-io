@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ..constants import Fields
 from ..exceptions import ParseError
 from ..normalization import _records_from_loaded_list
 from ..normalization import _records_from_un_normalized_list
@@ -15,13 +16,26 @@ BIBTEX_FIELD_ALIASES = {
     "shortjournal": "journal_abbreviation",
 }
 
+_HEADER_FIELDS = frozenset(
+    {
+        Fields.ORIGIN,
+        Fields.STATUS,
+        Fields.FILE,
+        Fields.SCREENING_CRITERIA,
+        Fields.MD_PROV,
+    }
+)
 
-def _parse_fields(body: str) -> list[tuple[str, str]]:
+
+def _parse_fields(
+    body: str, *, field_filter: frozenset[str] | None = None
+) -> list[tuple[str, str]]:
     """Parse field assignments while allowing arbitrarily nested braces."""
     assignments = re.compile(r"([\w.-]+)\s*=\s*")
-    fields = []
+    parsed_fields = []
     position = 0
     while match := assignments.search(body, position):
+        include_field = field_filter is None or match.group(1).lower() in field_filter
         value_start = match.end()
         if value_start >= len(body):
             break
@@ -42,10 +56,12 @@ def _parse_fields(body: str) -> list[tuple[str, str]]:
                 if char != "\\":
                     escaped = False
                 value_end += 1
-            if depth:
+            if depth and include_field:
                 raise ParseError(
                     f"Unterminated braced BibTeX value for field {match.group(1)!r}"
                 )
+            if depth:
+                value_end = len(body)
         elif body[value_start] == '"':
             escaped = False
             value_end = value_start + 1
@@ -59,16 +75,19 @@ def _parse_fields(body: str) -> list[tuple[str, str]]:
                     escaped = False
                 value_end += 1
             else:
-                raise ParseError(
-                    f"Unterminated quoted BibTeX value for field {match.group(1)!r}"
-                )
+                if include_field:
+                    raise ParseError(
+                        f"Unterminated quoted BibTeX value for field {match.group(1)!r}"
+                    )
+                value_end = len(body)
         else:
             value_end = value_start
             while value_end < len(body) and body[value_end] not in ", \t\r\n":
                 value_end += 1
-        fields.append((match.group(1), body[value_start:value_end]))
+        if include_field:
+            parsed_fields.append((match.group(1), body[value_start:value_end]))
         position = value_end
-    return fields
+    return parsed_fields
 
 
 def _decode_mapping(value: str, field: str) -> dict[str, dict[str, str]]:
@@ -145,30 +164,30 @@ def load_bibtex(
             "ID": entry.group(2),
             "ENTRYTYPE": entry.group(1).lower(),
         }
-        if not header_only:
-            body = text[start:end]
-            for field_name, raw_value in _parse_fields(body):
-                raw_value = raw_value.strip()
-                value = raw_value
-                if (value.startswith("{") and value.endswith("}")) or (
-                    value.startswith('"') and value.endswith('"')
-                ):
-                    value = value[1:-1]
-                field_name = field_name.lower()
-                value = value.strip()
-                if field_name in mapping_fields | list_fields:
-                    if not raw_value.startswith("{"):
-                        raise ParseError(
-                            f"Structured BibTeX field {field_name!r} must use a braced value"
-                        )
-                    value = value.lstrip("{").rstrip("}")
-                    record[field_name] = (
-                        _decode_mapping(value, field_name)
-                        if field_name in mapping_fields
-                        else _decode_list(value, field_name)
+        body = text[start:end]
+        header_fields = _HEADER_FIELDS if header_only else None
+        for field_name, raw_value in _parse_fields(body, field_filter=header_fields):
+            raw_value = raw_value.strip()
+            value = raw_value
+            if (value.startswith("{") and value.endswith("}")) or (
+                value.startswith('"') and value.endswith('"')
+            ):
+                value = value[1:-1]
+            field_name = field_name.lower()
+            value = value.strip()
+            if field_name in mapping_fields | list_fields:
+                if not raw_value.startswith("{"):
+                    raise ParseError(
+                        f"Structured BibTeX field {field_name!r} must use a braced value"
                     )
-                else:
-                    record[field_name] = value
+                value = value.lstrip("{").rstrip("}")
+                record[field_name] = (
+                    _decode_mapping(value, field_name)
+                    if field_name in mapping_fields
+                    else _decode_list(value, field_name)
+                )
+            else:
+                record[field_name] = value
         parsed.append(
             normalize_source_record(
                 record, format="bib", field_aliases=BIBTEX_FIELD_ALIASES

@@ -257,6 +257,43 @@ def test_primary_dict_header_only_skips_fields(tmp_path: Path) -> None:
     assert records == {"one": {"ID": "one", "ENTRYTYPE": "article"}}
 
 
+def test_primary_dict_header_only_extracts_record_headers(tmp_path: Path) -> None:
+    source = tmp_path / "record-headers.bib"
+    source.write_text(
+        """@article{one,
+ title={A title},
+ colrev_origin={source-one; source-two;},
+ colrev_status={rev_included},
+ file={papers/one.pdf},
+ screening_criteria={include},
+ colrev_masterdata_provenance={title:database;imported;},
+ abstract={ignored payload}
+}""",
+        encoding="utf-8",
+    )
+
+    records = bibio.load_primary(
+        source,
+        header_only=True,
+        mapping_fields=["colrev_masterdata_provenance"],
+        list_fields=["colrev_origin"],
+    )
+
+    assert records == {
+        "one": {
+            "ID": "one",
+            "ENTRYTYPE": "article",
+            "colrev_origin": ["source-one", "source-two"],
+            "colrev_status": "rev_included",
+            "file": "papers/one.pdf",
+            "screening_criteria": "include",
+            "colrev_masterdata_provenance": {
+                "title": {"source": "database", "note": "imported"}
+            },
+        }
+    }
+
+
 def test_primary_dict_writer_validates_ids_and_round_trips_structured_fields(
     tmp_path: Path,
 ) -> None:

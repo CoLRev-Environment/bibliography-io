@@ -241,7 +241,14 @@ def load_primary(
     mapping_fields: Any = (),
     list_fields: Any = (),
 ) -> dict[str, dict[str, Any]]:
-    """Load primary records from a file as an ID-indexed dictionary."""
+    """Load primary records from a file as an ID-indexed dictionary.
+
+    For BibTeX, ``header_only=True`` extracts ``ID``, ``ENTRYTYPE``,
+    ``colrev_origin``, ``colrev_status``, ``file``, ``screening_criteria``,
+    and ``colrev_masterdata_provenance`` while skipping other fields.
+    Declare origin as a list field or provenance as a mapping field when those
+    values should be decoded into structured Python values.
+    """
     if not isinstance(header_only, bool):
         raise TypeError("header_only must be a bool")
     source = Path(path)
