@@ -219,6 +219,17 @@ def test_dataframe_helpers_preserve_raw_order_and_primary_ids(tmp_path: Path) ->
     assert bibio.get_nr_records(source) == 2
 
 
+def test_missing_file_helpers_return_empty_results(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.bib"
+
+    assert bibio.load_primary(missing) == {}
+    assert bibio.get_nr_records(missing) == 0
+
+
+def test_loads_primary_empty_text_returns_empty_dictionary() -> None:
+    assert bibio.loads_primary("", format="bib") == {}
+
+
 def test_removed_compatibility_aliases_are_not_exposed() -> None:
     for name in ("load", "write_file", "load_df", "dumps"):
         assert not hasattr(bibio, name)

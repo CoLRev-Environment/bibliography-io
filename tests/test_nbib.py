@@ -40,9 +40,7 @@ def test_nbib_repeated_publication_types_are_preserved() -> None:
 
 
 def test_nbib_single_publication_type_remains_a_scalar() -> None:
-    records = loads_raw(
-        "PT  - Journal Articles\n", format="nbib", normalize=False
-    )
+    records = loads_raw("PT  - Journal Articles\n", format="nbib", normalize=False)
 
     assert records[0]["PT"] == "Journal Articles"
 

@@ -254,7 +254,7 @@ def load_primary(
     source = Path(path)
     format_name = _format_from_path(source, format)
     if not source.is_file():
-        raise FileNotFoundError(source)
+        return {}
     mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
     if header_only and format_name != "bib":
         raise UnsupportedFormatError("header_only is only supported for BibTeX")
@@ -334,6 +334,8 @@ def load_primary_df(
 
 def get_nr_records(filename: str | Path) -> int:
     """Return the number of raw records in a file."""
+    if not Path(filename).is_file():
+        return 0
     return len(load_raw(filename))
 
 
