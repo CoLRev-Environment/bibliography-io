@@ -476,6 +476,110 @@ def write(
     destination.write_text(output, encoding="utf-8")
 
 
+def update(
+    path: str | Path,
+    records: Mapping[str, Mapping[str, Any]],
+    *,
+    mapping_fields: Any = (),
+    list_fields: Any = (),
+    field_order: Any = None,
+    sort_fields: bool = True,
+) -> None:
+    """Update primary BibTeX records in place, appending records not present.
+
+    Existing entries with IDs in ``records`` are replaced; entries with other
+    IDs are left untouched. Records are supplied as an ID-keyed mapping. This
+    byte-scanning update assumes entry headers are on their own lines and that
+    field text does not contain ``@`` at the start of a line.
+    """
+    if not isinstance(records, Mapping):
+        raise RecordValidationError(
+            "primary records must be a mapping of IDs to records"
+        )
+    if not isinstance(sort_fields, bool):
+        raise TypeError("sort_fields must be a bool")
+    values = list(records.values())
+    if any(not isinstance(record, dict) for record in values):
+        raise RecordValidationError("each primary record must be a mapping")
+    _index_primary_records(values)
+    for record_id, record in records.items():
+        if record_id != record["ID"]:
+            raise RecordValidationError(
+                f"primary record mapping key {record_id!r} does not match its ID"
+            )
+
+    mappings, lists = _structured_fields("bib", mapping_fields, list_fields)
+    ordered_fields = _normalize_field_order("bib", field_order)
+    normalized = normalize_records(records, format="bib")
+    if mappings:
+        normalized = {
+            record_id: {
+                key: value
+                for key, value in record.items()
+                if not (
+                    key.lower() in mappings and isinstance(value, dict) and not value
+                )
+            }
+            for record_id, record in normalized.items()
+        }
+    serialized = {
+        record_id: (
+            write_string(
+                {record_id: record},
+                "bib",
+                mapping_fields=mappings,
+                list_fields=lists,
+                field_order=ordered_fields,
+                sort_fields=sort_fields,
+                sort_by_id=False,
+            )
+            + "\n"
+        ).encode("utf-8")
+        for record_id, record in sorted(normalized.items())
+    }
+
+    destination = Path(path)
+    if destination.is_file():
+        content = destination.read_bytes()
+        starts: list[tuple[int, str]] = []
+        offset = 0
+        for line in content.splitlines(keepends=True):
+            if b"@" in line[:3]:
+                opening = line.find(b"{")
+                comma = line.find(b",", opening + 1)
+                if opening < 0 or comma < 0:
+                    raise RecordValidationError("invalid BibTeX entry header")
+                try:
+                    record_id = line[opening + 1 : comma].decode("utf-8")
+                except UnicodeDecodeError as exc:
+                    raise RecordValidationError(
+                        "BibTeX entry IDs must be valid UTF-8"
+                    ) from exc
+                starts.append((offset, record_id))
+            offset += len(line)
+
+        updated = bytearray()
+        cursor = 0
+        for index, (start, record_id) in enumerate(starts):
+            end = starts[index + 1][0] if index + 1 < len(starts) else len(content)
+            if record_id in serialized:
+                updated.extend(content[cursor:start])
+                updated.extend(serialized.pop(record_id))
+                cursor = end
+        updated.extend(content[cursor:])
+        destination.write_bytes(updated)
+
+    if serialized:
+        with destination.open("ab") as output:
+            if destination.is_file() and destination.stat().st_size:
+                with destination.open("rb") as current:
+                    current.seek(-1, 2)
+                    if current.read(1) not in {b"\n", b"\r"}:
+                        output.write(b"\n")
+            for record in serialized.values():
+                output.write(record)
+
+
 def _markdown_table(records: dict[str, dict[str, Any]]) -> str:
     fields = list(dict.fromkeys(key for record in records.values() for key in record))
 
@@ -511,5 +615,6 @@ __all__ = [
     "loads_primary",
     "loads_raw",
     "to_string",
+    "update",
     "write",
 ]

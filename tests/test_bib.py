@@ -4,16 +4,16 @@ from pathlib import Path
 
 import pytest
 
-from bibliography_io import to_string
 from bibliography_io import load_raw
 from bibliography_io import loads_raw
+from bibliography_io import to_string
+from bibliography_io import update
 from bibliography_io import write
 from bibliography_io import write_string
 from bibliography_io.exceptions import ParseError
 from bibliography_io.exceptions import RecordValidationError
 from bibliography_io.exceptions import SerializationError
 from bibliography_io.exceptions import UnsupportedFormatError
-
 
 DATA = Path(__file__).parent / "data" / "bib"
 ORIGINAL_DUPLICATE_FIXTURE = DATA / "load.bib"
@@ -65,6 +65,100 @@ def test_unique_id_round_trip_uses_expected_fixtures(tmp_path: Path) -> None:
 
     assert text.strip() == expected_text.strip()
     assert load_raw(output) == records
+
+
+def test_update_replaces_matching_records_and_preserves_other_bytes(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "records.bib"
+    untouched = b"@misc{keep,\n   title = {Keep exactly},\n}\n\n"
+    path.write_bytes(
+        b"% bibliography header\n"
+        b"@article{replace,\n   title = {Old},\n}\n\n" + untouched
+    )
+
+    update(
+        path,
+        {
+            "replace": {
+                "ID": "replace",
+                "ENTRYTYPE": "article",
+                "title": "A much longer replacement",
+            }
+        },
+    )
+
+    content = path.read_bytes()
+    assert content.startswith(b"% bibliography header\n")
+    assert b"title                         = {A much longer replacement}" in content
+    assert content.endswith(untouched)
+
+
+def test_update_appends_records_missing_from_file(tmp_path: Path) -> None:
+    path = tmp_path / "records.bib"
+    path.write_text("@misc{existing,\n}\n", encoding="utf-8")
+
+    update(
+        path,
+        {"new": {"ID": "new", "ENTRYTYPE": "article", "title": "New"}},
+    )
+
+    content = path.read_text(encoding="utf-8")
+    assert "@misc{existing," in content
+    assert "@article{new," in content
+
+
+def test_update_handles_shorter_replacement(tmp_path: Path) -> None:
+    path = tmp_path / "records.bib"
+    path.write_text(
+        "@article{replace,\n   title = {A very long old value},\n}\n\n"
+        "@misc{keep,\n   title = {Keep},\n}",
+        encoding="utf-8",
+    )
+
+    update(
+        path,
+        {"replace": {"ID": "replace", "ENTRYTYPE": "article", "title": "Short"}},
+    )
+
+    content = path.read_text(encoding="utf-8")
+    assert "title                         = {Short}" in content
+    assert content.endswith("@misc{keep,\n   title = {Keep},\n}")
+
+
+def test_update_creates_file_and_serializes_structured_fields(tmp_path: Path) -> None:
+    path = tmp_path / "new.bib"
+    update(
+        path,
+        {
+            "new": {
+                "ID": "new",
+                "ENTRYTYPE": "article",
+                "colrev_origin": ["source"],
+                "colrev_masterdata_provenance": {
+                    "title": {"source": "source", "note": ""}
+                },
+            }
+        },
+        mapping_fields={"colrev_masterdata_provenance"},
+        list_fields={"colrev_origin"},
+    )
+
+    record = load_raw(
+        path,
+        mapping_fields={"colrev_masterdata_provenance"},
+        list_fields={"colrev_origin"},
+    )[0]
+    assert record["colrev_origin"] == ["source"]
+    assert record["colrev_masterdata_provenance"]["title"]["source"] == "source"
+
+
+def test_update_requires_mapping_keys_to_match_record_ids(tmp_path: Path) -> None:
+    with pytest.raises(RecordValidationError, match="does not match its ID"):
+        update(
+            tmp_path / "records.bib",
+            {"mapping-key": {"ID": "record-id", "ENTRYTYPE": "article"}},
+        )
 
 
 def test_bibtex_writer_aligns_fields_per_entry() -> None:
