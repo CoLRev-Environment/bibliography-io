@@ -7,7 +7,7 @@ from bibliography_io.normalization import normalize_source_record
 from bibliography_io.loaders.bibtex import BIBTEX_FIELD_ALIASES
 from bibliography_io.loaders import load_string
 from bibliography_io.loaders.ris import RIS_FIELD_ALIASES
-from bibliography_io.writers.tabular import write_table
+from bibliography_io.writers.csv import write_csv
 
 
 def test_field_aliases_are_source_specific_and_opt_in() -> None:
@@ -98,9 +98,8 @@ def test_non_normalized_json_preserves_source_values() -> None:
 def test_internal_dispatchers_accept_format_keyword() -> None:
     parsed = load_string('[{"ENTRYTYPE":"misc","title":"Example"}]', format="json")
     tagged = load_string("PT  - JOUR\nTI  - Example\n", format="nbib")
-    written = write_table(
-        {"example": {"ID": "example", "ENTRYTYPE": "misc", "title": "Example"}},
-        format="csv",
+    written = write_csv(
+        {"example": {"ID": "example", "ENTRYTYPE": "misc", "title": "Example"}}
     )
 
     assert parsed[0]["title"] == "Example"

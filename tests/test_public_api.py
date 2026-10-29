@@ -336,7 +336,7 @@ def test_primary_dict_writer_validates_ids_and_round_trips_structured_fields(
         write([{"ID": "one", "ENTRYTYPE": "article"}], path=output, primary=True)
 
 
-def test_primary_writer_omits_empty_mapping_fields_only_for_primary_records(
+def test_writer_omits_empty_mapping_fields_for_primary_and_raw_records(
     tmp_path: Path,
 ) -> None:
     records = {
@@ -366,7 +366,7 @@ def test_primary_writer_omits_empty_mapping_fields_only_for_primary_records(
     raw_text = raw_output.read_text(encoding="utf-8")
     assert "empty_provenance" not in primary_text
     assert "   provenance" in primary_text
-    assert "   empty_provenance" in raw_text
+    assert "empty_provenance" not in raw_text
 
 
 def test_primary_writer_and_raw_writer_sort_ids_by_default(

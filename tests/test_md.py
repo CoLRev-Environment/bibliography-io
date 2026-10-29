@@ -81,3 +81,31 @@ def test_markdown_table_write(tmp_path: Path) -> None:
     output = tmp_path / "table.md"
     write(records, path=output)
     assert "| title |" in output.read_text(encoding="utf-8")
+
+
+def test_markdown_writer_can_preserve_input_field_and_record_order() -> None:
+    records = {
+        "z": {
+            "ID": "z",
+            "ENTRYTYPE": "article",
+            "title": "Zulu",
+            "zeta": "Z",
+            "alpha": "A",
+        },
+        "a": {
+            "ID": "a",
+            "ENTRYTYPE": "article",
+            "title": "Alpha",
+            "alpha": "a",
+            "zeta": "z",
+        },
+    }
+
+    text = to_string(records, format="md", sort_fields=False, sort_by_id=False)
+
+    assert text.splitlines() == [
+        "| ID | ENTRYTYPE | title | zeta | alpha |",
+        "| --- | --- | --- | --- | --- |",
+        "| z | article | Zulu | Z | A |",
+        "| a | article | Alpha | z | a |",
+    ]

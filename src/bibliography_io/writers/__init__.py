@@ -47,8 +47,12 @@ def write_string(
         from .ris import write_ris
 
         return write_ris(data)
-    if format_name in {"csv", "md"}:
-        from .tabular import write_table
+    if format_name == "csv":
+        from .csv import write_csv
 
-        return write_table(data, format=format_name)
+        return write_csv(data, sort_fields=sort_fields, sort_by_id=sort_by_id)
+    if format_name == "md":
+        from .markdown_table import write_markdown
+
+        return write_markdown(data, sort_fields=sort_fields, sort_by_id=sort_by_id)
     raise UnsupportedFormatError(f"Writing {format_name} is unsupported")

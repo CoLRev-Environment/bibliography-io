@@ -359,8 +359,9 @@ def to_string(
     By default, ``field_order`` (or the CoLRev-oriented order when omitted) is
     followed by remaining fields alphabetically. Set ``sort_fields=False`` to
     preserve the input field order without sorting.
-    Inputs are sorted by record ID by default; set ``sort_by_id=False`` to
-    preserve list order or mapping iteration order.
+    Inputs are sorted by record ID by default. CSV, Markdown, Excel, and RIS
+    output always uses ID order; ``sort_by_id=False`` preserves input order only
+    for formats that support it.
     """
     if not isinstance(sort_by_id, bool):
         raise TypeError("sort_by_id must be a bool")
@@ -405,9 +406,10 @@ def write(
     BibTeX. By default, ``field_order`` (or the CoLRev-oriented order when
     omitted) is followed by remaining fields alphabetically. Set
     ``sort_fields=False`` to preserve input field order without sorting. Inputs
-    are sorted by record ID by default; set
-    ``sort_by_id=False`` to preserve list order or mapping iteration order.
-    ``primary=True`` continues to sort the validated primary mapping by ID.
+    are sorted by record ID by default. CSV, Markdown, Excel, and RIS output
+    always uses ID order; ``sort_by_id=False`` preserves input order only for
+    formats that support it. ``primary=True`` continues to sort the validated
+    primary mapping by ID.
     """
     if not isinstance(primary, bool):
         raise TypeError("primary must be a bool")
@@ -451,28 +453,24 @@ def write(
     if primary:
         normalized = dict(sorted(normalized.items(), key=lambda item: item[1]["ID"]))
     if format_name == "xlsx":
-        try:
-            import pandas as pd
+        from .writers.excel import write_excel
 
-            pd.DataFrame(normalized.values()).to_excel(destination, index=False)
-        except ImportError as exc:
-            raise OptionalBackendUnavailableError(
-                "Writing Excel files requires Excel dependencies. Install them with "
-                "'pip install bibliography-io[excel]'."
-            ) from exc
-        return
-    if format_name == "md":
-        output = _markdown_table(normalized)
-    else:
-        output = write_string(
+        write_excel(
             normalized,
-            format_name,
-            mapping_fields=mappings,
-            list_fields=lists,
-            field_order=ordered_fields,
+            destination,
             sort_fields=sort_fields,
-            sort_by_id=False,
+            sort_by_id=sort_by_id,
         )
+        return
+    output = write_string(
+        normalized,
+        format_name,
+        mapping_fields=mappings,
+        list_fields=lists,
+        field_order=ordered_fields,
+        sort_fields=sort_fields,
+        sort_by_id=False,
+    )
     destination.write_text(output, encoding="utf-8")
 
 
@@ -578,23 +576,6 @@ def update(
                         output.write(b"\n")
             for record in serialized.values():
                 output.write(record)
-
-
-def _markdown_table(records: dict[str, dict[str, Any]]) -> str:
-    fields = list(dict.fromkeys(key for record in records.values() for key in record))
-
-    def clean(value: Any) -> str:
-        return str(value).replace("|", r"\|").replace("\n", " ")
-
-    lines = [
-        "| " + " | ".join(fields) + " |",
-        "| " + " | ".join("---" for _ in fields) + " |",
-    ]
-    lines.extend(
-        "| " + " | ".join(clean(record.get(key, "")) for key in fields) + " |"
-        for record in records.values()
-    )
-    return "\n".join(lines)
 
 
 __all__ = [

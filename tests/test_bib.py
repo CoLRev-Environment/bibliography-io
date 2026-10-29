@@ -565,7 +565,7 @@ def test_declared_lists_use_semicolon_format_and_round_trip() -> None:
     )
 
 
-def test_empty_declared_mapping_and_list_round_trip() -> None:
+def test_empty_declared_mapping_and_list_are_omitted() -> None:
     records = {"example": {"ENTRYTYPE": "misc", "provenance": {}, "origins": []}}
     text = to_string(
         records,
@@ -580,8 +580,52 @@ def test_empty_declared_mapping_and_list_round_trip() -> None:
         mapping_fields=["provenance"],
         list_fields=["origins"],
     )
-    assert parsed[0]["provenance"] == {}
-    assert parsed[0]["origins"] == []
+    assert "provenance" not in parsed[0]
+    assert "origins" not in parsed[0]
+
+
+def test_bibtex_writer_skips_only_exact_empty_string_dict_and_list() -> None:
+    records = {
+        "example": {
+            "ENTRYTYPE": "misc",
+            "empty_string": "",
+            "empty_mapping": {},
+            "empty_list": [],
+            "none_value": None,
+            "whitespace": " ",
+            "nan_value": float("nan"),
+        }
+    }
+
+    text = to_string(records, format="bib")
+
+    assert "empty_string" not in text
+    assert "empty_mapping" not in text
+    assert "empty_list" not in text
+    assert "none_value" in text and "{None}" in text
+    assert "whitespace" in text and "{ }" in text
+    assert "nan_value" in text and "{nan}" in text
+
+
+def test_bibtex_writer_formats_legacy_provenance_fields() -> None:
+    records = {
+        "example": {
+            "ENTRYTYPE": "article",
+            "colrev_origin": ["B", "A;", "A"],
+            "colrev_masterdata_provenance": {
+                "title": {"source": "db;={value}", "note": "z,a,,b"}
+            },
+        }
+    }
+
+    text = to_string(records, format="bib")
+
+    assert "colrev_origin" in text
+    assert (
+        "{A;\n                                    A;\n                                    B;}"
+        in text
+    )
+    assert "colrev_masterdata_provenance  = {title:db___value_;a,b,z;}" in text
 
 
 def test_undeclared_structures_keep_writing_error() -> None:

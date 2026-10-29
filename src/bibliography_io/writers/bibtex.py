@@ -7,8 +7,6 @@ from typing import Any
 from ..exceptions import SerializationError
 from ..normalization import normalize_field_name
 
-_FIELD_NAME_WIDTH = len("colrev_masterdata_provenance")
-
 _DEFAULT_FIELD_ORDER = (
     "colrev_origin",
     "colrev_status",
@@ -36,6 +34,50 @@ _DEFAULT_FIELD_ORDER = (
     "url",
     "abstract",
 )
+
+
+def _sanitize_provenance_text(value: str) -> str:
+    return value.replace(";", "_").replace("=", "_").replace("{", "_").replace("}", "_")
+
+
+def _legacy_provenance_values(value: dict[str, Any], field: str) -> list[str]:
+    """Serialize legacy CoLRev provenance mappings as delimited entries."""
+    entries = []
+    for name, provenance in value.items():
+        if not isinstance(provenance, dict):
+            continue
+        source = provenance.get("source")
+        note = provenance.get("note")
+        if not isinstance(source, str) or not isinstance(note, str):
+            raise SerializationError(
+                f"BibTeX provenance field {field!r} entries require string "
+                "'source' and 'note' values"
+            )
+        formatted_note = ",".join(
+            sorted(item for item in note.split(",") if item != "")
+        )
+        entries.append(
+            f"{name}:{_sanitize_provenance_text(source)};"
+            f"{_sanitize_provenance_text(formatted_note)};"
+        )
+    return entries
+
+
+def _legacy_list_value(value: list[Any], field: str) -> str:
+    if any(not isinstance(item, str) for item in value):
+        raise SerializationError(
+            f"BibTeX structured field {field!r} must contain only strings"
+        )
+    return ("\n" + " " * 36).join(item.rstrip() for item in value)
+
+
+def _origin_values(value: list[Any]) -> list[str]:
+    if any(not isinstance(item, str) for item in value):
+        raise SerializationError("BibTeX field 'colrev_origin' must contain strings")
+    origins = []
+    for origin in sorted(set(value)):
+        origins.append(origin if origin.endswith(";") else f"{origin};")
+    return origins
 
 
 def _brace_scalar(value: Any) -> str:
@@ -107,13 +149,6 @@ def _encode_list(value: list[Any], field: str) -> list[str]:
     return [f"{_validate_delimited_text(item, field=field)};" for item in value]
 
 
-def _braced_lines(prefix: str, values: list[str]) -> str:
-    if not values:
-        return "{}"
-    continuation = " " * (len(prefix) + 1)
-    return "{" + ("\n" + continuation).join(values) + "}"
-
-
 def write_bibtex(
     records: dict[str, dict[str, Any]],
     *,
@@ -162,8 +197,32 @@ def write_bibtex(
         for key, value in ordered_fields:
             if key in {"ID", "ENTRYTYPE"}:
                 continue
+            if (
+                isinstance(value, str)
+                and value == ""
+                or isinstance(value, dict)
+                and not value
+                or isinstance(value, list)
+                and not value
+            ):
+                continue
+
             field_name = key.lower()
-            if field_name in mapping_fields | list_fields:
+            if field_name == "colrev_origin" and isinstance(value, list):
+                values = _origin_values(value)
+                value = "{" + ("\n" + " " * 36).join(values) + "}"
+            elif field_name in {
+                "colrev_masterdata_provenance",
+                "colrev_data_provenance",
+            } and isinstance(value, dict):
+                values = _legacy_provenance_values(value, key)
+                value = "{" + ("\n" + " " * 36).join(values) + "}"
+            elif field_name in {
+                "colrev_masterdata_provenance",
+                "colrev_data_provenance",
+            } and isinstance(value, list):
+                value = "{" + _legacy_list_value(value, key) + "}"
+            elif field_name in mapping_fields | list_fields:
                 expected_type = dict if field_name in mapping_fields else list
                 expected_label = "mapping" if expected_type is dict else "list"
                 if not isinstance(value, expected_type):
@@ -171,19 +230,17 @@ def write_bibtex(
                         f"BibTeX field {key!r} was declared as a {expected_label} "
                         f"field but has value {value!r}"
                     )
-                prefix = f"   {key:<{_FIELD_NAME_WIDTH}}  = "
                 values = (
                     _encode_mapping(value, key)
                     if expected_type is dict
                     else _encode_list(value, key)
                 )
-                value = _braced_lines(prefix, values)
+                value = "{" + ("\n" + " " * 36).join(values) + "}"
             else:
                 value = _brace_scalar(value)
-            fields.append(f"   {key:<{_FIELD_NAME_WIDTH}}  = {value}")
-        if fields:
-            fields[-1] += ","
+            padding = " " * max(0, 28 - len(key))
+            fields.append(f",\n   {key} {padding} = {value}")
         entries.append(
-            f"@{record['ENTRYTYPE']}{{{record['ID']},\n" + ",\n".join(fields) + "\n}"
+            f"@{record['ENTRYTYPE']}{{{record['ID']}" + "".join(fields) + ",\n}"
         )
     return "\n\n".join(entries)
