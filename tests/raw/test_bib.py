@@ -15,7 +15,7 @@ from bibliography_io.exceptions import RecordValidationError
 from bibliography_io.exceptions import SerializationError
 from bibliography_io.exceptions import UnsupportedFormatError
 
-DATA = Path(__file__).parent / "data" / "bib"
+DATA = Path(__file__).parents[1] / "data" / "bib"
 ORIGINAL_DUPLICATE_FIXTURE = DATA / "load.bib"
 
 
@@ -493,12 +493,10 @@ def test_malformed_bibtex_raises_parse_error() -> None:
 def test_bibtex_dotted_field_names_are_preserved_when_loading() -> None:
     text = "@article{example, colrev.vendor.identifier={abc123}}"
 
-    normalized = loads_raw(text, format="bib")
-    un_normalized = loads_raw(text, format="bib", normalize=False)
+    parsed = loads_raw(text, format="bib")
 
-    assert normalized[0]["colrev.vendor.identifier"] == "abc123"
-    assert un_normalized[0]["colrev.vendor.identifier"] == "abc123"
-    assert "colrev_vendor_identifier" not in normalized[0]
+    assert parsed[0]["colrev.vendor.identifier"] == "abc123"
+    assert "colrev_vendor_identifier" not in parsed[0]
 
 
 def test_bibtex_dotted_field_names_are_preserved_when_writing(tmp_path: Path) -> None:

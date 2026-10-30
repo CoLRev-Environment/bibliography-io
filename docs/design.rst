@@ -22,10 +22,10 @@ different interfaces and outputs, and may not distinguish raw records from
 primary records. This makes it harder to combine sources and manage records
 throughout a review.
 
-The package aims to keep its core free of mandatory runtime dependencies, using
-optional backends where additional format support requires them. Its design is
-inspired in part by Pandoc's approach to working across formats through a
-common interface.
+Bibliography-io has no mandatory runtime dependencies and uses optional
+backends where additional format support requires them. Its design is inspired
+in part by Pandoc's approach to working across formats through a common
+interface.
 
 Raw data API
 ------------
@@ -35,20 +35,15 @@ ways those formats are used are not always under strict control. The raw data
 API is designed to be robust to that variation across supported formats and to
 write output that different consumers can import.
 
-Its loading interfaces return ordered lists. Source-specific packages extend
-bibliography-io as plugins, and the loading interfaces accept optional source
-tags:
+Raw loading returns ordered lists and preserves parser-level field names and
+value types. Generic or source-specific normalization is selected through the
+convenience ``load()`` interface:
 
 .. code-block:: python
 
-   load_raw(
-       path, *, format=None, source=None, source_version=None,
-       standardize_field_names=True
-   ) -> list[dict]
-   loads_raw(
-       string, *, format=..., source=None, source_version=None,
-       standardize_field_names=True
-   ) -> list[dict]
+   load_raw(path, *, format=None, mapping_fields=(), list_fields=()) -> list[dict]
+   loads_raw(string, *, format=..., mapping_fields=(), list_fields=()) -> list[dict]
+   load(path, *, source=None, source_version=None, format=None) -> list[dict]
 
 The corresponding writing interfaces are:
 
@@ -65,9 +60,9 @@ The corresponding writing interfaces are:
 The raw API follows these principles:
 
 - File APIs infer the format from a recognized suffix when ``format`` is omitted.
-  String APIs require an explicit format. If a file format cannot be inferred
-  from its suffix or the selected format is unsupported for the operation,
-  ``UnsupportedFormatError`` is raised.
+  Supply ``format`` when the suffix is ambiguous or does not match the file's
+  actual format. String APIs require an explicit format. An unknown or
+  unsupported format raises ``UnsupportedFormatError``.
 - Raw loading does not require record IDs to be present or unique. Raw parsing
   does not generate IDs. Accordingly, loading returns a list rather than an
   ID-indexed dictionary, preserving source order and every record. This may
@@ -75,111 +70,58 @@ The raw API follows these principles:
 - Unknown fields are preserved and are not silently discarded. If the selected
   destination format cannot represent a field or value, writing raises
   ``SerializationError``.
-- With ``normalize=False``, field values retain their parser-level types; for
-  example, ``author`` may be a string, list, or mapping depending on the source
-  format. With the default ``normalize=True``, common bibliographic fields such
-  as ``author`` are represented as predictable strings for downstream use.
-  Normalization may be lossy, so callers that need the source structure should
-  use ``normalize=False``.
-- By default, field names use the standardization currently built into
-  bibliography-io. A source-specific package may provide source- and
-  version-specific field-name mappings or preprocessing as a plugin; see
-  :ref:`source-specific-parsing` for the plugin loading design. Without a
-  source plugin, ambiguous conversions or decisions specific to a format
-  belong to format-specific or downstream packages.
-- The optional ``source`` and ``source_version`` tags identify the system or
-  provider that produced the data and, when relevant, its export version. They
-  are distinct from ``format``: for example, ``format="xml"`` describes the
-  encoded representation, while ``source="web_of_science"`` identifies its origin
-  (formats like ``xml`` may be provided by different sources with different
-  syntax). ``source_version`` is a label for version-specific loading or export
-  behavior.
-- Source-specific parsing and processing are provided by separately
-  installable packages that extend bibliography-io as plugins. The core format
-  parser remains the default when no source is specified; see
+- ``load_raw()`` and ``loads_raw()`` return parser-level values, including
+  repeated fields as lists and structured values as mappings where the format
+  supports them. They do not normalize field names or values and do not assign
+  IDs.
+- ``load()`` applies generic normalization unless a source is supplied, in
+  which case source-specific preprocessing and field normalization are used.
+  ``source_version`` optionally identifies provider/export conventions. These
+  identifiers are distinct from ``format``, which describes the encoding. See
+  :ref:`record-shape` for the public value-type guarantees.
+- Source-specific parsing and normalization are provided by separately
+  installable packages that extend bibliography-io as plugins. They may map
+  fields and interpret source/version-specific values. See
   :ref:`source-specific-parsing` for the loading pipeline.
 - Metadata preparation (e.g., of author and language fields), and lookup
   searches are responsibilities of downstream packages.
 
-File writes replace the destination. Markdown table writing is core
-functionality; Markdown reference-list parsing is an optional, lazily loaded
+File writes replace the destination. Markdown table writing is built into
+bibliography-io; Markdown reference-list parsing is an optional, lazily loaded
 backend. Format-specific options for raw loading and writing, including options
-for JSON and other core formats, belong to this API and must be documented with
-the relevant format. Core functions accept no undocumented options. Structured
-BibTeX field options for primary data are described in the Primary Data API
-section.
+for JSON and other formats built into bibliography-io, belong to this API and
+must be documented with the relevant format. Public bibliography-io functions
+accept no undocumented options. Structured BibTeX field options for primary
+data are described in the Primary Data API section.
 
 .. _source-specific-parsing:
 
 Source-specific parsing
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Separately installable source-specific packages extend bibliography-io as
-plugins registered through the plugin infrastructure. The core owns and
-orchestrates loading; a source plugin supplies hooks that run at defined points
-in that pipeline. Conceptually, ``load_raw()`` follows this sequence:
+The ``load()`` and ``loads()`` APIs can apply source-specific processing from an
+installed CoLRev search-source package. Without ``source``, ``load()`` uses
+generic normalization. With ``source``, bibliography-io discovers the package
+by its unique endpoint identifier (for example, ``colrev.crossref``) and passes
+the optional ``source_version`` through its hooks. This endpoint is distinct
+from the package's ``source_identifier``, which describes record fields and is
+not used for package selection.
 
-.. code-block:: python
+Bibliography-io owns the loading pipeline:
 
-   def load_raw(path, *, format=None, source=None, source_version=None):
-        string, resolved_format = read_input(path, format=format)
-       plugin = get_source_plugin(source) if source else None
+1. Resolve the input format.
+2. For text inputs, allow the package to preprocess the text; for file-based
+   inputs, allow it to return the original path or a transformed temporary file.
+3. Parse the resulting input into parser-level records.
+4. Apply source-specific normalization and return an ordered list of records.
 
-       if plugin:
-            string = plugin.preprocess(
-                string, format=resolved_format,
-               source_version=source_version,
-           )
-
-        records = parse(string, format=resolved_format)
-       records = normalize_basic(records, plugin=plugin)
-
-       if plugin:
-           records = plugin.postprocess(
-               records, format=resolved_format,
-               source_version=source_version,
-           )
-
-       return validate_records(records)
-
-``read_input()`` resolves and reads the file, while ``parse()``,
-``normalize_basic()``, and ``validate_records()`` represent core stages. The
-plugin's ``preprocess()`` hook can adapt source-specific input strings before
-parsing. ``postprocess()`` receives parsed, basically normalized records for
-source-specific transformations. The same stages apply to ``loads_raw()`` after
-its input string and required format have been validated. With no source specified,
-the core uses its generic format handling and skips the plugin hooks.
-
-Source- and version-specific field-name mappings supplied by a plugin
-participate in ``normalize_basic()``: they extend built-in mappings and take
-precedence for matching source fields. They are separate from other plugin
-preprocessing and post-processing. Accordingly,
-``standardize_field_names=False`` disables both built-in and plugin-provided
-field-name standardization. Other source-specific preprocessing and
-post-processing may still run, but must not change field names when this option
-is false.
-
-Users may access a source through either the ``bibliography-io`` API or the
-source-specific package. The latter exposes a thin convenience facade that
-selects its source in the core API, for example:
-
-.. code-block:: python
-
-   # provider_x_bibliography/__init__.py
-   def load_raw(path, *, format=None, source_version=None):
-       return bibliography_io.load_raw(
-           path,
-           format=format,
-           source="provider_x",
-           source_version=source_version,
-       )
-
-Both entry points use the core's orchestrated pipeline. The plugin hook
-implementation must not call the source-dispatching ``load_raw()`` with the
-same source, which would dispatch back to that plugin. With no source specified,
-the matching source plugin is not used. A requested source plugin that is
-unavailable raises ``OptionalBackendUnavailableError``; an unsupported
-source/format/version combination raises ``UnsupportedFormatError``.
+The source normalizer returns an ID-keyed mapping; bibliography-io validates it
+and adapts it to the public list return type. Without a source, bibliography-io
+applies generic normalization instead. The raw ``load_raw()`` and ``loads_raw()``
+APIs bypass source hooks and expose parser-level records. Source extensions are
+optional, so using bibliography-io without a selected source does not require
+CoLRev. See :doc:`source_extensions` for package registration, hook contracts,
+and file-preprocessing details.
 
 Primary Data API
 ----------------
@@ -223,9 +165,7 @@ The primary-data API follows these principles:
   dictionary shape with only ``ID`` and ``ENTRYTYPE`` in each record; the default
   ``False`` returns complete records.
 - Entry types are open, lowercase strings.
-- Ordinary bibliographic field values in primary records are strings. Mapping
-  and list values are supported only for fields explicitly declared through
-  ``mapping_fields`` or ``list_fields``.
+- See :ref:`record-shape` for the primary loader's field-value contract.
 - ``mapping_fields`` and ``list_fields`` declare BibTeX fields that contain
   provenance mappings and string lists, respectively. These options are
   available for primary writes and ordinary/raw writes.
@@ -309,7 +249,7 @@ The standalone API raises the following exceptions:
    * - ``OSError`` / ``UnicodeDecodeError``
      - Reading or writing a file fails, or file contents are not valid UTF-8.
    * - ``UnsupportedFormatError``
-     - A core operation requests an unknown or unsupported format, or a source plugin does not support the requested source/format/version combination.
+     - A bibliography-io operation requests an unknown or unsupported format, or a CoLRev search-source package does not support the requested source/format/version combination.
    * - ``ParseError``
      - Input cannot be parsed as the selected format. Underlying parser errors are chained when available.
    * - ``RecordValidationError``
@@ -321,9 +261,9 @@ The standalone API raises the following exceptions:
    * - ``SerializationError``
      - A record or field value cannot be represented in the requested output format.
    * - ``OptionalBackendUnavailableError``
-     - A requested optional parsing or writing backend, including a source plugin, is not installed.
+     - A requested optional parsing or writing backend, including a CoLRev search-source package, is not installed.
    * - ``BackendExecutionError``
-     - An installed optional backend or source plugin fails while parsing or writing.
+     - An installed optional backend or CoLRev search-source package fails while parsing or writing.
 
 All package-defined exceptions inherit from ``BibliographyIOError``. Raw
 list-based parsing preserves records without applying primary-data ID
@@ -336,7 +276,7 @@ Compatibility policy
 
 Historical CoLRev callbacks and options (``entrytype_setter``, ``field_mapper``,
 ``unique_id_field``, ``id_labeler``, ``logger``, and ``empty_if_file_not_exists``) are
-CoLRev adapter behavior, not core API options. The legacy ``format_names`` option
+CoLRev adapter behavior, not bibliography-io API options. The legacy ``format_names`` option
 has been removed. CoLRev's adapter is responsible for callback ordering and
 legacy missing-file defaults. Historical ``colrev.loader.*`` and
 ``colrev.writer.*`` imports remain CoLRev compatibility facades during migration;

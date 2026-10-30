@@ -13,7 +13,8 @@
 </div>
 
 `bibliography-io` provides standalone loading and writing of bibliographic
-records. Its core API does not require CoLRev or GROBID.
+records. Using the base bibliography-io installation does not require CoLRev or
+GROBID.
 
 ## Installation
 
@@ -31,8 +32,8 @@ pip install "bibliography-io[excel]"     # Excel file support
 pip install "bibliography-io[all]"       # Both optional features
 ```
 
-Markdown reference-list parsing also requires a running GROBID service. Core
-formats do not require either extra.
+Markdown reference-list parsing also requires a running GROBID service. Formats
+available in the base bibliography-io installation do not require either extra.
 
 ## Usage
 
@@ -54,20 +55,23 @@ records = loads_raw("@article{example, title={An example}}", format="bib")
 text = to_string(records, format="bib")
 ```
 
+File formats are inferred from their suffixes; pass `format` to `load()` when a
+suffix is ambiguous or does not match the file's actual format.
+
 ### Format support
 
 | Format | Read files | Write files | String APIs |
 | --- | --- | --- | --- |
-| BibTeX (`.bib`) | Yes | Yes | `loads` / `to_string` |
-| RIS (`.ris`) | Yes | Yes | `loads` / `to_string` |
-| ENL / EndNote (`.enl`) | Yes | *Planned* | `loads` (`to_string` planned) |
-| NBIB (`.nbib`) | Yes | *Planned* | `loads` (`to_string` planned) |
-| JSON (`.json`) | Yes | *Planned* | `loads` (`to_string` planned) |
-| CSV (`.csv`) | Yes | Yes | `loads` / `to_string` |
+| BibTeX (`.bib`) | Yes | Yes | `loads_raw()` / `to_string()` |
+| RIS (`.ris`) | Yes | Yes | `loads_raw()` / `to_string()` |
+| ENL / EndNote (`.enl`) | Yes | *Planned* | `loads_raw()` (`to_string()` planned) |
+| NBIB (`.nbib`) | Yes | *Planned* | `loads_raw()` (`to_string()` planned) |
+| JSON (`.json`) | Yes | *Planned* | `loads_raw()` (`to_string()` planned) |
+| CSV (`.csv`) | Yes | Yes | `loads_raw()` / `to_string()` |
 | Excel (`.xls`, `.xlsx`) | Yes | Yes | File APIs only |
 | Markdown (`.md`) | *Planned* | *Planned* | *Planned* |
 
-Markdown table writing is built into the core.
+Markdown table writing is built into bibliography-io.
 Markdown reference-list parsing is planned as a separate optional feature; its
 backend and installation extra are not finalized. Requesting Markdown
 reference-list input without a registered backend raises

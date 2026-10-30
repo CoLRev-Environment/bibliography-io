@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from importlib.metadata import entry_points
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from .exceptions import BackendExecutionError
@@ -17,7 +19,9 @@ from .exceptions import SerializationError
 from .exceptions import UnsupportedFormatError
 from .normalization import normalize_field_name
 from .normalization import normalize_format
+from .normalization import normalize_loaded_record_values
 from .normalization import normalize_records
+from .normalization import normalize_source_record
 from .normalization import sort_records_by_id
 
 
@@ -97,6 +101,50 @@ def _structured_fields(
     return mappings, lists
 
 
+def _load_path_raw(
+    path: Path,
+    format_name: str,
+    *,
+    mappings: frozenset[str],
+    lists: frozenset[str],
+    text: str | None = None,
+) -> list[dict[str, Any]]:
+    """Parse a file into raw records, using path-based parsing for Excel."""
+    if format_name in {"xls", "xlsx"}:
+        from .loaders.tabular import load_excel
+
+        return load_excel(path, format=format_name)
+
+    if text is None:
+        text = path.read_text(encoding="utf-8-sig")
+    from .loaders import load_string
+
+    return load_string(
+        text,
+        format_name,
+        normalize=False,
+        mapping_fields=mappings,
+        list_fields=lists,
+        source=path,
+    )
+
+
+def _normalize_generic_records(
+    records: list[dict[str, Any]], *, format_name: str
+) -> list[dict[str, Any]]:
+    """Apply generic normalization, including tabular field aliases."""
+    from .normalization import normalize_loaded_records
+
+    field_aliases = None
+    if format_name in {"csv", "xls", "xlsx"}:
+        from .loaders.tabular import TABULAR_FIELD_ALIASES
+
+        field_aliases = TABULAR_FIELD_ALIASES
+    return normalize_loaded_records(
+        records, field_aliases=field_aliases, format=format_name
+    )
+
+
 def _normalize_field_order(format: str, field_order: Any) -> tuple[str, ...] | None:
     """Validate and normalize an optional output field order."""
     if field_order is None:
@@ -122,17 +170,14 @@ def loads_raw(
     text: str,
     *,
     format: str,
-    normalize: bool = True,
     mapping_fields: Any = (),
     list_fields: Any = (),
 ) -> list[dict[str, Any]]:
-    """Load raw records from a string, preserving order and source IDs.
+    """Load parser-level records from a string, preserving source order.
 
-    By default, returns normalized raw data for convenient access. Set
-    ``normalize=False`` to retain parser-level values for source-specific
-    processing. For BibTeX, ``mapping_fields`` and ``list_fields`` declare
-    provenance mappings and semicolon-delimited list fields. Supplying either
-    option for other formats raises
+    For BibTeX, ``mapping_fields`` and ``list_fields`` declare provenance
+    mappings and semicolon-delimited list fields. Supplying either option for
+    other formats raises
     :class:`UnsupportedFormatError`. Declared field names match the lowercased
     BibTeX names.
     """
@@ -145,7 +190,7 @@ def loads_raw(
     return load_string(
         text,
         format_name,
-        normalize=normalize,
+        normalize=False,
         mapping_fields=mappings,
         list_fields=lists,
         source="<string>",
@@ -156,15 +201,13 @@ def load_raw(
     path: str | Path,
     *,
     format: str | None = None,
-    normalize: bool = True,
     mapping_fields: Any = (),
     list_fields: Any = (),
 ) -> list[dict[str, Any]]:
-    """Load raw records as an ordered list; infer format from the suffix by default.
+    """Load parser-level records as an ordered list.
 
-    By default, returns normalized raw data for convenient access. Set
-    ``normalize=False`` for parser-level values and source-specific processing.
-    A missing path raises :class:`FileNotFoundError`. For BibTeX, callers may
+    The format is inferred from the suffix by default. A missing path raises
+    :class:`FileNotFoundError`. For BibTeX, callers may
     declare structured fields with ``mapping_fields`` and ``list_fields``;
     these options are unsupported for other formats.
     """
@@ -173,26 +216,300 @@ def load_raw(
     mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
     if not source.is_file():
         raise FileNotFoundError(source)
-    if format_name in {"xls", "xlsx"}:
-        from .loaders.tabular import load_excel
-        from .normalization import normalize_loaded_records
+    return _load_path_raw(source, format_name, mappings=mappings, lists=lists)
 
-        records = load_excel(source, format=format_name, normalize=normalize)
-        return (
-            normalize_loaded_records(records, list_fields=lists)
-            if normalize
-            else records
+
+def _source_plugin(source: str) -> Any:
+    """Load a CoLRev search-source class by its endpoint identifier."""
+    points = entry_points()
+    candidates = (
+        points.select(group="colrev", name="search_source")
+        if hasattr(points, "select")
+        else [
+            point for point in points.get("colrev", []) if point.name == "search_source"
+        ]
+    )
+    matches = []
+    for point in candidates:
+        try:
+            endpoint_class = point.load()
+        except Exception:
+            # A broken or unavailable unrelated source package should not
+            # prevent discovery of the requested endpoint.
+            continue
+        if getattr(endpoint_class, "endpoint", None) == source:
+            matches.append(endpoint_class)
+
+    if not matches:
+        raise OptionalBackendUnavailableError(
+            f"CoLRev search-source package {source!r} is not installed or could "
+            "not be loaded. Install the package providing that endpoint."
         )
-    string = source.read_text(encoding="utf-8-sig")
+    if len(matches) > 1:
+        raise BackendExecutionError(
+            f"Multiple CoLRev search-source packages declare endpoint {source!r}"
+        )
+    return matches[0]
+
+
+def _normalize_source_records(
+    records: list[dict[str, Any]],
+    *,
+    plugin: Any,
+    source: str,
+    format_name: str,
+    source_version: str | None,
+) -> list[dict[str, Any]]:
+    """Apply and validate a search-source plugin's normalization hook."""
+    normalize_hook = getattr(plugin, "normalize", None)
+    if normalize_hook is None:
+        raise UnsupportedFormatError(
+            f"Source plugin {source!r} does not provide a normalize hook"
+        )
+    try:
+        normalized = normalize_hook(
+            records, format=format_name, source_version=source_version
+        )
+    except (OptionalBackendUnavailableError, UnsupportedFormatError):
+        raise
+    except Exception as exc:
+        raise BackendExecutionError(
+            f"Source plugin {source!r} failed to normalize {format_name} records"
+        ) from exc
+    if not isinstance(normalized, Mapping) or any(
+        not isinstance(record_id, str)
+        or not record_id
+        or not isinstance(record, dict)
+        or record.get("ID") != record_id
+        for record_id, record in normalized.items()
+    ):
+        raise RecordValidationError(
+            "Search-source normalize() must return a mapping keyed by each "
+            "record's non-empty ID"
+        )
+    records = [
+        normalize_source_record(record, format=format_name)
+        for record in normalized.values()
+    ]
+    for record in records:
+        entrytype = record.get("ENTRYTYPE", "misc")
+        if not isinstance(entrytype, str) or not entrytype.strip():
+            raise RecordValidationError(
+                f"record {record['ID']!r} has an invalid ENTRYTYPE"
+            )
+        record["ENTRYTYPE"] = entrytype.lower()
+        normalize_loaded_record_values(record)
+    return records
+
+
+def _preprocess_source_file(
+    plugin: Any,
+    path: Path,
+    *,
+    format_name: str,
+    source: str,
+    source_version: str | None,
+    output_dir: Path,
+) -> Path:
+    """Run a source file hook and validate its returned input path."""
+    preprocess_file = getattr(plugin, "preprocess_file", None)
+    if preprocess_file is None:
+        return path
+    try:
+        preprocessed_path = preprocess_file(
+            path,
+            format=format_name,
+            source_version=source_version,
+            output_dir=output_dir,
+        )
+    except (OptionalBackendUnavailableError, UnsupportedFormatError):
+        raise
+    except Exception as exc:
+        raise BackendExecutionError(
+            f"Source plugin {source!r} failed to preprocess {format_name} file"
+        ) from exc
+
+    if not isinstance(preprocessed_path, (str, Path)):
+        raise RecordValidationError(
+            "Search-source preprocess_file() must return a file path"
+        )
+    preprocessed_path = Path(preprocessed_path)
+    if not preprocessed_path.is_file():
+        raise RecordValidationError(
+            "Search-source preprocess_file() must return an existing file path"
+        )
+    original_path = path.resolve()
+    returned_path = preprocessed_path.resolve()
+    temporary_root = output_dir.resolve()
+    if returned_path != original_path and not returned_path.is_relative_to(
+        temporary_root
+    ):
+        raise RecordValidationError(
+            "Search-source preprocess_file() must return the original path or a "
+            "file under output_dir"
+        )
+    return preprocessed_path
+
+
+def _load_text(
+    text: str,
+    *,
+    format_name: str,
+    source: str | None,
+    source_version: str | None,
+    location: str | Path,
+) -> list[dict[str, Any]]:
+    """Load and normalize text through the generic or source-specific pipeline."""
+    if not isinstance(text, str):
+        raise TypeError("input must be a string")
+    if source is not None and (not isinstance(source, str) or not source.strip()):
+        raise RecordValidationError("source must be a non-empty string when supplied")
+    if source_version is not None and not isinstance(source_version, str):
+        raise RecordValidationError("source_version must be a string or None")
+    mappings, lists = _structured_fields(format_name, (), ())
     from .loaders import load_string
 
-    return load_string(
-        string,
+    if source is None:
+        return load_string(
+            text,
+            format_name,
+            normalize=True,
+            mapping_fields=mappings,
+            list_fields=lists,
+            source=location,
+        )
+
+    plugin = _source_plugin(source)
+    preprocess = getattr(plugin, "preprocess", None)
+    if preprocess is not None:
+        try:
+            text = preprocess(text, format=format_name, source_version=source_version)
+        except (OptionalBackendUnavailableError, UnsupportedFormatError):
+            raise
+        except Exception as exc:
+            raise BackendExecutionError(
+                f"Source plugin {source!r} failed to preprocess {format_name} input"
+            ) from exc
+        if not isinstance(text, str):
+            raise RecordValidationError("Search-source preprocess() must return text")
+    records = load_string(
+        text,
         format_name,
-        normalize=normalize,
+        normalize=False,
         mapping_fields=mappings,
         list_fields=lists,
+        source=location,
+    )
+    return _normalize_source_records(
+        records,
+        plugin=plugin,
         source=source,
+        format_name=format_name,
+        source_version=source_version,
+    )
+
+
+def loads(
+    text: str,
+    *,
+    format: str,
+    source: str | None = None,
+    source_version: str | None = None,
+) -> list[dict[str, Any]]:
+    """Load and normalize records from text using a CoLRev source or fallback.
+
+    ``format`` is required because the input has no file suffix. ``xls`` and
+    ``xlsx`` are not supported because they require file-based input.
+    """
+    format_name = normalize_format(format)
+    if format_name in {"xls", "xlsx"}:
+        raise UnsupportedFormatError(f"Loading {format_name} from text is unsupported")
+    return _load_text(
+        text,
+        format_name=format_name,
+        source=source,
+        source_version=source_version,
+        location="<string>",
+    )
+
+
+def load(
+    path: str | Path,
+    *,
+    source: str | None = None,
+    source_version: str | None = None,
+    format: str | None = None,
+) -> list[dict[str, Any]]:
+    """Load records with normalized field names and string values.
+
+    The format is inferred from the file suffix unless ``format`` is supplied.
+    Use ``format`` when the suffix is ambiguous or does not match the file's
+    actual format. When ``source`` is supplied, it selects the CoLRev
+    search-source package with the matching endpoint identifier and applies its
+    preprocessing and normalization hooks. Otherwise, generic normalization is
+    applied. Both paths return string values for every field; repeated values
+    are combined and native non-string values are converted to strings. Use
+    :func:`loads` for text input, or :func:`load_raw` and :func:`loads_raw` for
+    parser-level records.
+    """
+    if source is not None and (not isinstance(source, str) or not source.strip()):
+        raise RecordValidationError("source must be a non-empty string when supplied")
+    if source_version is not None and not isinstance(source_version, str):
+        raise RecordValidationError("source_version must be a string or None")
+    source_path = Path(path)
+    format_name = _format_from_path(source_path, format)
+    if not source_path.is_file():
+        raise FileNotFoundError(source_path)
+    if source is None:
+        if format_name in {"xls", "xlsx"}:
+            mappings, lists = _structured_fields(format_name, (), ())
+            records = _load_path_raw(
+                source_path, format_name, mappings=mappings, lists=lists
+            )
+            return _normalize_generic_records(records, format_name=format_name)
+        string = source_path.read_text(encoding="utf-8-sig")
+        return _load_text(
+            string,
+            format_name=format_name,
+            source=None,
+            source_version=source_version,
+            location=source_path,
+        )
+
+    if format_name in {"xls", "xlsx"}:
+        if not isinstance(source, str) or not source.strip():
+            raise RecordValidationError(
+                "source must be a non-empty string when supplied"
+            )
+        mappings, lists = _structured_fields(format_name, (), ())
+        plugin = _source_plugin(source)
+        with TemporaryDirectory(prefix="bibliography-io-") as temporary_directory:
+            output_dir = Path(temporary_directory)
+            preprocessed_path = _preprocess_source_file(
+                plugin,
+                source_path,
+                format_name=format_name,
+                source=source,
+                source_version=source_version,
+                output_dir=output_dir,
+            )
+            records = _load_path_raw(
+                preprocessed_path, format_name, mappings=mappings, lists=lists
+            )
+            return _normalize_source_records(
+                records,
+                plugin=plugin,
+                source=source,
+                format_name=format_name,
+                source_version=source_version,
+            )
+    string = source_path.read_text(encoding="utf-8-sig")
+    return _load_text(
+        string,
+        format_name=format_name,
+        source=source,
+        source_version=source_version,
+        location=source_path,
     )
 
 
@@ -224,11 +541,17 @@ def loads_primary(
     list_fields: Any = (),
 ) -> dict[str, dict[str, Any]]:
     """Load primary records from a string as an ID-indexed dictionary."""
-    records = loads_raw(
+    format_name = normalize_format(format)
+    mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
+    from .loaders import load_string
+
+    records = load_string(
         text,
-        format=format,
-        mapping_fields=mapping_fields,
-        list_fields=list_fields,
+        format_name,
+        normalize=True,
+        mapping_fields=mappings,
+        list_fields=lists,
+        source="<string>",
     )
     return _index_primary_records(records)
 
@@ -241,13 +564,14 @@ def load_primary(
     mapping_fields: Any = (),
     list_fields: Any = (),
 ) -> dict[str, dict[str, Any]]:
-    """Load primary records from a file as an ID-indexed dictionary.
+    """Load primary records as an ID-indexed dictionary.
 
     For BibTeX, ``header_only=True`` extracts ``ID``, ``ENTRYTYPE``,
     ``colrev_origin``, ``colrev_status``, ``file``, ``screening_criteria``,
     and ``colrev_masterdata_provenance`` while skipping other fields.
-    Declare origin as a list field or provenance as a mapping field when those
-    values should be decoded into structured Python values.
+    Ordinary field values are strings. Declare fields through
+    ``mapping_fields`` or ``list_fields`` to decode their BibTeX values into
+    dictionaries or lists. Undeclared values remain strings.
     """
     if not isinstance(header_only, bool):
         raise TypeError("header_only must be a bool")
@@ -271,11 +595,22 @@ def load_primary(
             header_only=True,
         )
     else:
-        records = load_raw(
-            source,
-            format=format_name,
+        if format_name in {"xls", "xlsx"}:
+            records = _load_path_raw(
+                source, format_name, mappings=mappings, lists=lists
+            )
+            records = _normalize_generic_records(records, format_name=format_name)
+            return _index_primary_records(records)
+        string = source.read_text(encoding="utf-8-sig")
+        from .loaders import load_string
+
+        records = load_string(
+            string,
+            format_name,
+            normalize=True,
             mapping_fields=mappings,
             list_fields=lists,
+            source=source,
         )
     return _index_primary_records(records)
 
@@ -292,22 +627,20 @@ def _load_pandas() -> Any:
     return pd
 
 
-def load_raw_df(
+def load_df(
     path: str | Path,
     *,
+    source: str | None = None,
+    source_version: str | None = None,
     format: str | None = None,
-    normalize: bool = True,
-    mapping_fields: Any = (),
-    list_fields: Any = (),
 ) -> Any:
-    """Load raw records into a DataFrame, preserving source order as rows."""
-    records = load_raw(
-        path,
-        format=format,
-        normalize=normalize,
-        mapping_fields=mapping_fields,
-        list_fields=list_fields,
-    )
+    """Load normalized records into a DataFrame.
+
+    ``format`` overrides suffix inference when a file suffix is ambiguous or
+    does not match the file's actual format. Source-specific normalization can
+    be selected with ``source`` and ``source_version``.
+    """
+    records = load(path, source=source, source_version=source_version, format=format)
     pd = _load_pandas()
     return pd.DataFrame(records)
 
@@ -589,10 +922,12 @@ __all__ = [
     "SerializationError",
     "UnsupportedFormatError",
     "get_nr_records",
+    "load",
+    "load_df",
     "load_primary",
     "load_primary_df",
     "load_raw",
-    "load_raw_df",
+    "loads",
     "loads_primary",
     "loads_raw",
     "to_string",

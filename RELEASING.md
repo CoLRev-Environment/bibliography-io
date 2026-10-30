@@ -30,16 +30,17 @@ version and package name with the maintainers before publishing.
    From outside the source checkout, smoke-test imports and a BibTeX file
    round-trip with the installed wheel. The wheel test must not install the
    optional extras.
-3. Markdown table output is part of core testing. Test Markdown reference-list
-   parsing with the ``markdown`` extra and Excel load/write with the ``excel``
-   extra. The installed-wheel smoke test should continue to run without extras.
+3. Built-in Markdown table output is part of the default test suite. Test
+   Markdown reference-list parsing with the ``markdown`` extra and Excel
+   load/write with the ``excel`` extra. The installed-wheel smoke test should
+   continue to run without extras.
 4. Update `project.version` in `pyproject.toml`, add release notes, and keep the
    version in the Git tag synchronized with package metadata.
 
 ## TestPyPI verification
 
-Upload the built artifacts and test installation of the core package without
-optional extras:
+Upload the built artifacts and test installation of the base bibliography-io
+package without optional extras:
 
 ```shell
 python -m twine upload --repository testpypi dist/*

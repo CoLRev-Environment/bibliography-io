@@ -57,7 +57,12 @@ def load_string(
         else:
             raise UnsupportedFormatError(f"Reading {format} is unsupported")
         return (
-            normalize_loaded_records(result, list_fields=list_fields, format=format)
+            normalize_loaded_records(
+                result,
+                mapping_fields=mapping_fields,
+                list_fields=list_fields,
+                format=format,
+            )
             if normalize
             else result
         )

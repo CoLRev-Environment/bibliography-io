@@ -2,12 +2,13 @@ bibliography-io
 ===============
 
 ``bibliography-io`` provides standalone APIs for loading and writing
-bibliographic records. Core use does not require CoLRev or GROBID.
+bibliographic records. Using the base installation does not require CoLRev or
+GROBID.
 
 Installation
 ------------
 
-Install the core package with:
+Install the base bibliography-io package with:
 
 .. code-block:: console
 
@@ -23,7 +24,7 @@ Optional dependencies enable Markdown parsing and Excel file support:
 
 Markdown parsing uses CoLRev and GROBID and requires a running GROBID service.
 Excel loading and writing require the ``excel`` extra. Markdown table writing
-is included in the core package.
+is included in bibliography-io without an extra.
 
 Quick example
 -------------
@@ -47,7 +48,8 @@ an explicit format:
     bibtex = to_string(records, format="bib")
 
 See :doc:`usage` for supported formats, :doc:`api` for the public interface,
-and :doc:`design` for the standalone API and compatibility contract.
+:doc:`source_extensions` for CoLRev source hooks, and :doc:`design` for the
+standalone API and compatibility contract.
 
 .. toctree::
    :maxdepth: 2
@@ -55,5 +57,6 @@ and :doc:`design` for the standalone API and compatibility contract.
 
    usage
    api
+   source_extensions
    design
    development

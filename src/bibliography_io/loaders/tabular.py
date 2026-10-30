@@ -32,20 +32,13 @@ def load_csv(text: str, *, normalize: bool = True) -> list[dict[str, Any]]:
     )
 
 
-def load_excel(
-    source: Path, format: str, *, normalize: bool = True
-) -> list[dict[str, Any]]:
-    """Load Excel rows as bibliography records using the optional Excel extra."""
+def load_excel(source: Path, format: str) -> list[dict[str, Any]]:
+    """Parse Excel rows into parser-level records using the optional Excel extra."""
     try:
         import pandas as pd
 
         rows = pd.read_excel(source).fillna("").to_dict(orient="records")
-        if not normalize:
-            return _records_from_un_normalized_list(rows)
-        normalized = normalize_source_rows(
-            rows, field_aliases=TABULAR_FIELD_ALIASES, format=format
-        )
-        return _records_from_loaded_list(normalized)
+        return _records_from_un_normalized_list(rows)
     except ImportError as exc:
         raise OptionalBackendUnavailableError(
             f"Reading {format} files requires Excel dependencies. Install them with "

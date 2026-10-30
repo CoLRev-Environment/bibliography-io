@@ -55,61 +55,158 @@ for ENL, and ``markdown`` for Markdown. File suffixes are case-insensitive.
 Markdown forms and optional dependencies
 -----------------------------------------
 
-Markdown table output is core functionality and does not need an optional
-backend. Markdown reference-list parsing uses CoLRev and GROBID and is enabled
-by installing ``bibliography-io[markdown]``. A running GROBID service is also
-required. Without the extra, a Markdown read raises
+Markdown table output is built into bibliography-io and does not need an
+optional backend. Markdown reference-list parsing uses CoLRev and GROBID and is
+enabled by installing ``bibliography-io[markdown]``. A running GROBID service is
+also required. Without the extra, a Markdown read raises
 ``OptionalBackendUnavailableError``. Excel loading and writing require
 ``bibliography-io[excel]``; the ``all`` extra installs both optional feature
 sets.
 
+.. _record-shape:
+
 Record shape
 ------------
 
-Records are ordered mappings keyed by string ``ID`` values. Each record has
-``ID`` and ``ENTRYTYPE`` fields. Source IDs are preserved; missing IDs are
-assigned sequentially without collisions; duplicate IDs raise an error.
-Unknown fields are retained where the output format can represent them.
+``load_raw()`` and ``loads_raw()`` return records in source order as a list of
+dictionaries. They preserve parser-level field names and value types: values
+may be strings, lists for repeated fields, mappings, or other format-native
+values. Raw loading does not require or generate record IDs, and it does not
+apply source-specific normalization. Unknown fields are retained.
+
+``load()`` returns records in source order as a list of dictionaries with
+normalized field names and string values. This applies both to generic
+normalization and to results returned by source-specific normalization hooks.
+Repeated values are combined into strings (authors use `` and ``; keywords use
+``; ``; other conflicting values use ``; ``). Empty scalar values and empty
+items in repeated values are omitted. A
+source-specific hook may select and normalize fields, but its non-string field
+values are converted to strings before ``load()`` returns. Supply a ``source``
+identifier and optional ``source_version`` to use source-specific preprocessing
+and normalization:
+
+.. code-block:: python
+
+    from bibliography_io import load
+
+    records = load(
+        "references.ris",
+        source="colrev.crossref",
+        source_version="2026",
+    )
+
+Without ``source``, ``load()`` applies bibliography-io's generic normalization.
+When a source is selected, ``source`` names the CoLRev package by its unique
+endpoint identifier, such as ``colrev.crossref``. The format is inferred from
+the file suffix unless ``format`` is supplied; use ``format`` if the suffix is
+ambiguous or does not match the file's actual format. See
+:doc:`source_extensions` for package discovery and preprocessing/normalization
+hook details.
 
 DataFrame helpers
 -----------------
 
-``load_raw_df()`` returns raw records as DataFrame rows in source order, with a
-default ``RangeIndex``. ``load_primary_df()`` returns primary records with IDs
-as the DataFrame index. Both functions accept the corresponding options from
-``load_raw()`` and ``load_primary()``. Pandas is optional; install the Excel
-extra with ``pip install bibliography-io[excel]`` to use these helpers.
+``load_df()`` returns the normalized records from ``load()`` as DataFrame rows
+in source order, with a default ``RangeIndex``. It accepts ``source``,
+``source_version``, and ``format``. ``load_primary_df()`` returns primary
+records with IDs as the DataFrame index. Parser-level records remain available
+as lists through ``load_raw()`` and ``loads_raw()``. Pandas is optional; install
+the Excel extra with ``pip install bibliography-io[excel]`` to use these helpers.
 
 ``get_nr_records()`` returns the number of raw records in a file.
 
 .. code-block:: python
 
+    from bibliography_io import load_df
     from bibliography_io import load_primary_df
-    from bibliography_io import load_raw_df
 
-    raw = load_raw_df("references.ris")
+    normalized = load_df("references.ris")
     primary = load_primary_df("references.bib")
 
-Loaded records are **raw** in the sense that they have not been curated as
-primary records. ``load_raw`` and ``loads_raw`` return **normalized raw data**
-by default, for convenient access and as a fallback representation. Pass
-``normalize=False`` to access **non-normalized raw data** for maximum control
-or source-specific processing:
+Raw records have not been curated as primary records. Normalization belongs to
+``load()`` and is generic unless a source is selected. Formats retain their own
+limits on what parser-level information can be represented. Unlike ``load()``,
+``load_primary()`` and ``loads_primary()`` retain mapping and list values only
+for BibTeX fields explicitly declared with ``mapping_fields`` and
+``list_fields``; all other field values are strings. The declarations define
+how those BibTeX fields are parsed, and do not change the behavior of ``load()``.
+
+Format examples
+---------------
+
+String loaders require an explicit format. Use ``loads_raw()`` to inspect
+format-specific field names and parser-level values; use ``loads()`` for
+normalized field names and values. In normalized records, authors are combined
+into one ``author`` string joined by the word ``and``.
 
 .. code-block:: python
 
-   convenient = load_raw("references.ris")
-   source_values = load_raw("references.ris", normalize=False)
+    from bibliography_io import loads, loads_raw
 
-Normalized raw data uses canonical field names, removes empty repeated values,
-deduplicates exact matches, and represents ordinary fields as strings. Multiple
-authors are joined with ``" and "`` and keywords with ``"; "``. Distinct
-non-empty repeated values for other fields are joined with ``"; "`` in their
-source order. Non-normalized values retain source-level field names and
-repeated-value structure where the format permits it; formats may have
-different limits on what source information can be represented. Explicitly
-declared BibTeX provenance mappings and lists retain their container types when
-loaded with the corresponding field declarations.
+    bib = """\
+    @article{g2021,
+      title  = {Trust},
+      author = {Guo, Wenbo and Straub, Detmar},
+    }
+    """
+    loads_raw(bib, format="bib")
+    # [
+    #     {
+    #         'ID': 'g2021',
+    #         'ENTRYTYPE': 'article',
+    #         'title': 'Trust',
+    #         'author': 'Guo, Wenbo and Straub, Detmar',
+    #     }
+    # ]
+
+    ris = """\
+    TY  - JOUR
+    TI  - Trust
+    AU  - Guo, Wenbo
+    AU  - Straub, Detmar
+    ER  -
+    """
+    loads_raw(ris, format="ris")
+    # [
+    #     {
+    #         'TY': 'JOUR',
+    #         'TI': 'Trust',
+    #         'AU': ['Guo, Wenbo', 'Straub, Detmar'],
+    #     }
+    # ]
+    loads(ris, format="ris")
+    # [
+    #     {
+    #         'ENTRYTYPE': 'article',
+    #         'title': 'Trust',
+    #         'author': 'Guo, Wenbo and Straub, Detmar',
+    #     }
+    # ]
+
+    json_text = """[
+      {
+        "title": "Trust",
+        "authors": ["Guo, Wenbo", "Straub, Detmar"],
+        "metadata": {"rank": 1}
+      }
+    ]"""
+    loads_raw(json_text, format="json")
+    # [
+    #     {
+    #         'title': 'Trust',
+    #         'authors': ['Guo, Wenbo', 'Straub, Detmar'],
+    #         'metadata': {'rank': 1},
+    #     }
+    # ]
+    loads(json_text, format="json")
+    # [
+    #     {
+    #         'title': 'Trust',
+    #         'author': 'Guo, Wenbo and Straub, Detmar',
+    #         'metadata': "{'rank': 1}",
+    #         'ENTRYTYPE': 'misc',
+    #     }
+    # ]
 
 Structured BibTeX fields
 ------------------------

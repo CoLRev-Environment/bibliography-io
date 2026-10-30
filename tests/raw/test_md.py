@@ -11,7 +11,7 @@ from bibliography_io import loads_raw
 from bibliography_io import write
 from bibliography_io.exceptions import OptionalBackendUnavailableError
 
-DATA = Path(__file__).parent / "data" / "md"
+DATA = Path(__file__).parents[1] / "data" / "md"
 
 
 def test_markdown_reference_fixture_requires_optional_backend(

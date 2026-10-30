@@ -236,48 +236,65 @@ def normalize_loaded_records(
     records: list[dict[str, Any]],
     *,
     field_aliases: Mapping[str, str] | None = None,
+    mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
     format: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Return convenient scalar-valued raw records from parsed records."""
+    """Return normalized records with strings except declared structures."""
     output = []
     for raw in records:
         record = normalize_source_record(
             dict(raw), format=format, field_aliases=field_aliases
         )
-        for field, value in list(record.items()):
-            if (
-                field in {"ID", "ENTRYTYPE"}
-                or isinstance(value, Mapping)
-                or field in list_fields
-            ):
-                continue
-            if isinstance(value, (list, tuple, set)):
-                values = value if not isinstance(value, set) else sorted(value)
-            else:
-                values = [value]
-            unique = []
-            for item in values:
-                if item is None or str(item).strip() == "":
-                    continue
-                text = str(item)
-                if text not in unique:
-                    unique.append(text)
-            if field == "author":
-                record[field] = " and ".join(unique)
-            elif field in {"keywords", "keyword"}:
-                record[field] = "; ".join(unique)
-            elif len(unique) > 1:
-                # Conflicting scalar values are retained, in source order, as
-                # a readable string rather than changing the field's type.
-                record[field] = "; ".join(unique)
-            else:
-                if unique:
-                    record[field] = unique[0]
-                else:
-                    del record[field]
+        normalize_loaded_record_values(
+            record, mapping_fields=mapping_fields, list_fields=list_fields
+        )
         output.append(record)
     return output
+
+
+def normalize_loaded_record_values(
+    record: dict[str, Any],
+    *,
+    mapping_fields: frozenset[str] = frozenset(),
+    list_fields: frozenset[str] = frozenset(),
+) -> dict[str, Any]:
+    """Convert ordinary field values to strings, preserving declared structures."""
+    for field, value in list(record.items()):
+        if field == "ID":
+            record[field] = str(value)
+            continue
+        if field == "ENTRYTYPE":
+            record[field] = str(value).lower()
+            continue
+        if field in mapping_fields or field in list_fields:
+            continue
+        if isinstance(value, Mapping):
+            values = [value]
+        elif isinstance(value, (list, tuple, set)):
+            values = value if not isinstance(value, set) else sorted(value)
+        else:
+            values = [value]
+        unique = []
+        for item in values:
+            if item is None or str(item).strip() == "":
+                continue
+            text = str(item)
+            if text not in unique:
+                unique.append(text)
+        if field == "author":
+            record[field] = " and ".join(unique)
+        elif field in {"keywords", "keyword"}:
+            record[field] = "; ".join(unique)
+        elif len(unique) > 1:
+            # Conflicting scalar values are retained, in source order, as
+            # a readable string rather than changing the field's type.
+            record[field] = "; ".join(unique)
+        elif unique:
+            record[field] = unique[0]
+        else:
+            del record[field]
+    return record
 
 
 def _records_from_list(
