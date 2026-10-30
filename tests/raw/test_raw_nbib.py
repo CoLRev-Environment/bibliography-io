@@ -27,6 +27,12 @@ def test_nbib_repeated_publication_types_are_preserved() -> None:
     assert records[0]["PT"] == ["Journal Articles", "Reports - Research"]
 
 
+def test_nbib_repeated_authors_are_preserved_as_a_list() -> None:
+    records = loads_raw("AU  - Smith, Tom\nAU  - Hunter, Shawn\n", format="nbib")
+
+    assert records[0]["AU"] == ["Smith, Tom", "Hunter, Shawn"]
+
+
 def test_nbib_single_publication_type_remains_a_scalar() -> None:
     records = loads_raw("PT  - Journal Articles\n", format="nbib")
 

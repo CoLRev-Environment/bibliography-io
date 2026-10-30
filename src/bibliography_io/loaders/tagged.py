@@ -65,7 +65,7 @@ def load_tagged(
                         if normalize
                         else tag
                     )
-                    if key == "author" and key in current:
+                    if normalize and key == "author" and key in current:
                         current[key] = f"{current[key]} and {value}"
                     elif key in current:
                         previous = current[key]

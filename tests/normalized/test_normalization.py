@@ -43,6 +43,9 @@ def test_field_aliases_are_source_specific_and_opt_in() -> None:
     assert normalize_source_record(
         {"colrev.web_of_science.unique-id": "WOS:123"}, format="bib"
     ) == {"colrev.web_of_science.unique-id": "WOS:123"}
+    assert normalize_source_record(
+        {"colrev.pubmed.pubmedid": "12345"}, format="csv"
+    ) == {"colrev.pubmed.pubmedid": "12345"}
 
 
 def test_normalize_records_accepts_explicit_field_aliases() -> None:

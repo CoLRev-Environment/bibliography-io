@@ -56,8 +56,10 @@ def normalize_source_record(
         key = normalize_field_name(
             str(field),
             field_aliases=field_aliases,
-            preserve_dots=format == "bib",
-            preserve_dashes=format == "bib" and str(field).startswith("colrev."),
+            # CoLRev extension fields are namespaced regardless of the source
+            # format (e.g. CSV columns can be ``colrev.pubmed.pubmedid``).
+            preserve_dots=format == "bib" or str(field).startswith("colrev."),
+            preserve_dashes=str(field).startswith("colrev."),
         )
         if key == "id" and format in _TABLE_FORMATS:
             normalized[key] = value
