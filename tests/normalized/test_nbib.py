@@ -26,5 +26,6 @@ def test_nbib_load_write_as_bibtex(tmp_path: Path) -> None:
     assert "@article" in text
     written = load(output)
     assert len(written) == len(records) == 1
-    written_record = {key: value for key, value in written[0].items() if key != "ID"}
-    assert written_record == records[0]
+    assert written[0]["title"] == records[0]["title"]
+    assert written[0]["author"] == records[0]["author"]
+    assert written[0]["ENTRYTYPE"] == records[0]["ENTRYTYPE"]

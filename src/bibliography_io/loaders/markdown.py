@@ -7,14 +7,17 @@ from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any
 
-from ..exceptions import BackendExecutionError
-from ..exceptions import OptionalBackendUnavailableError
-from ..normalization import _records_from_loaded_list
+from ..exceptions import BackendExecutionError, OptionalBackendUnavailableError
 from ..normalization import _records_from_un_normalized_list
 
 
+def normalize_without_source(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Pass backend-normalized Markdown records to shared validation."""
+    return records
+
+
 def load_markdown(
-    text: str, *, source: str | Path, normalize: bool = True
+    text: str, *, location: str | Path, normalize: bool = True
 ) -> list[dict[str, Any]]:
     """Load reference-list Markdown through a plugin or the optional GROBID backend."""
     points = entry_points()
@@ -27,17 +30,18 @@ def load_markdown(
         try:
             backend = point.load()
             result = (
-                backend.loads(text, source=source)
+                backend.loads(text, source=location)
                 if hasattr(backend, "loads")
-                else backend(text, source=source)
+                else backend(text, source=location)
             )
             if isinstance(result, dict):
                 result = list(result.values())
-            return (
-                _records_from_loaded_list(result)
-                if normalize
-                else _records_from_un_normalized_list(result)
-            )
+            records = _records_from_un_normalized_list(result)
+            if normalize:
+                from .. import _normalize_without_source
+
+                return _normalize_without_source(records, format_name="md")
+            return records
         except OptionalBackendUnavailableError:
             raise
         except Exception as exc:
@@ -46,7 +50,12 @@ def load_markdown(
             ) from exc
 
     try:
-        return _load_with_grobid(text, source=source, normalize=normalize)
+        records = _load_with_grobid(text, location=location)
+        if normalize:
+            from .. import _normalize_without_source
+
+            return _normalize_without_source(records, format_name="md")
+        return records
     except OptionalBackendUnavailableError:
         raise
     except ImportError as exc:
@@ -60,14 +69,12 @@ def load_markdown(
         ) from exc
 
 
-def _load_with_grobid(
-    text: str, *, source: str | Path, normalize: bool = True
-) -> list[dict[str, Any]]:
+def _load_with_grobid(text: str, *, location: str | Path) -> list[dict[str, Any]]:
     import requests
     from colrev.env.grobid_service import GrobidService
 
     logger = logging.getLogger(__name__)
-    logger.info("Parsing Markdown references from %s", source)
+    logger.info("Parsing Markdown references from %s", location)
     grobid_service = GrobidService()
     grobid_service.check_grobid_availability()
     references = [line.rstrip() for line in text.splitlines() if "#" not in line[:2]]
@@ -84,4 +91,4 @@ def _load_with_grobid(
 
     from .bibtex import load_bibtex
 
-    return load_bibtex(bibtex, normalize=normalize)
+    return load_bibtex(bibtex, normalize=False)

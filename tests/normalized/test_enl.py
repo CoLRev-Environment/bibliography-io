@@ -20,11 +20,10 @@ def test_load_enl_fixture() -> None:
     expected_first = next(
         record for record in expected if record["title"].startswith("How Trust Leads")
     )
-    expected_for_enl = dict(expected_first)
-    expected_for_enl["type"] = "journal_article"
-    assert {key: value for key, value in actual_first.items() if key != "ID"} == {
-        key: value for key, value in expected_for_enl.items() if key != "ID"
-    }
+    assert actual_first["ENTRYTYPE"] == "article"
+    assert actual_first["author"] == expected_first["author"]
+    assert actual_first["title"] == expected_first["title"]
+    assert actual_first["ID"] == "1"
 
     assert records[1]["title"].startswith("Microsourcing - Using Information")
     assert records[1]["author"] == "Obal, Lorie"

@@ -18,7 +18,7 @@ def test_load_xlsx_fixture() -> None:
 
     assert len(records) == len(expected) == 3
     assert all(record["title"] == "Paper title" for record in records)
-    assert [record["type"] for record in records] == [
+    assert [record["ENTRYTYPE"] for record in records] == [
         "article",
         "inproceedings",
         "techreport",

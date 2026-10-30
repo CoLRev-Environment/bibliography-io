@@ -7,14 +7,35 @@ from typing import Any
 
 from ..constants import Fields
 from ..exceptions import ParseError
-from ..normalization import _records_from_loaded_list
 from ..normalization import _records_from_un_normalized_list
+from ..normalization import namespace_unknown_fields
 from ..normalization import normalize_source_record
 
 BIBTEX_FIELD_ALIASES = {
     "journaltitle": "journal",
     "shortjournal": "journal_abbreviation",
 }
+
+
+def normalize_without_source(
+    records: list[dict[str, Any]],
+    *,
+    mapping_fields: frozenset[str] = frozenset(),
+    list_fields: frozenset[str] = frozenset(),
+) -> list[dict[str, Any]]:
+    """Apply no-source entry-type and unknown-field normalization to BibTeX."""
+    for index, record in enumerate(records):
+        records[index] = normalize_source_record(
+            record, format="bib", field_aliases=BIBTEX_FIELD_ALIASES
+        )
+        record = records[index]
+        record.setdefault("ENTRYTYPE", "misc")
+        record["ENTRYTYPE"] = str(record["ENTRYTYPE"]).lower()
+        if record["ENTRYTYPE"] in {"www", "electronic"}:
+            record["ENTRYTYPE"] = "misc"
+    namespace_unknown_fields(records, preserve_fields=mapping_fields | list_fields)
+    return records
+
 
 _HEADER_FIELDS = frozenset(
     {
@@ -188,17 +209,16 @@ def load_bibtex(
                 )
             else:
                 record[field_name] = value
-        parsed.append(
-            normalize_source_record(
-                record, format="bib", field_aliases=BIBTEX_FIELD_ALIASES
-            )
-            if normalize
-            else record
-        )
+        parsed.append(record)
     if text.strip() and not parsed:
         raise ParseError("No BibTeX entries found")
-    return (
-        _records_from_loaded_list(parsed, format="bib")
-        if normalize
-        else _records_from_un_normalized_list(parsed)
-    )
+    if normalize:
+        from .. import _normalize_without_source
+
+        return _normalize_without_source(
+            parsed,
+            format_name="bib",
+            mapping_fields=mapping_fields,
+            list_fields=list_fields,
+        )
+    return _records_from_un_normalized_list(parsed)

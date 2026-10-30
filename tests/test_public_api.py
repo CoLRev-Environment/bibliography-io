@@ -1,15 +1,14 @@
 """Tests for bibliography_io's standalone public API."""
 
-from inspect import signature
 import subprocess
 import sys
+from inspect import signature
 from pathlib import Path
 
 import pytest
 
 import bibliography_io as bibio
-from bibliography_io import load_raw
-from bibliography_io import write
+from bibliography_io import load_raw, write
 
 
 def test_strict_public_api_is_exposed() -> None:
@@ -56,7 +55,12 @@ def test_raw_and_generic_load_contracts(tmp_path: Path) -> None:
 
     assert bibio.load_raw(source) == [{"TY": "JOUR", "TI": "A title", "AU": "Ada"}]
     assert bibio.load(source) == [
-        {"ENTRYTYPE": "article", "title": "A title", "author": "Ada"}
+        {
+            "ENTRYTYPE": "article",
+            "ID": "000001",
+            "title": "A title",
+            "author": "Ada",
+        }
     ]
 
 
@@ -65,13 +69,24 @@ def test_load_format_can_override_suffix(tmp_path: Path) -> None:
     source.write_text("TY  - JOUR\nTI  - A title\nER  -", encoding="utf-8")
 
     assert bibio.load(source, format="ris") == [
-        {"ENTRYTYPE": "article", "title": "A title"}
+        {"ENTRYTYPE": "article", "ID": "000001", "title": "A title"}
     ]
 
 
 def test_loads_generic_text_contract() -> None:
     assert bibio.loads("TY  - JOUR\nTI  - A title\nAU  - Ada\nER  -", format="ris") == [
-        {"ENTRYTYPE": "article", "title": "A title", "author": "Ada"}
+        {
+            "ENTRYTYPE": "article",
+            "ID": "000001",
+            "title": "A title",
+            "author": "Ada",
+        }
+    ]
+
+
+def test_txt_uses_generic_normalization() -> None:
+    assert bibio.loads("%T A tagged title\n", format="txt") == [
+        {"ENTRYTYPE": "article", "title": "A tagged title"}
     ]
 
 

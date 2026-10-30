@@ -17,6 +17,58 @@ ALIASES = {"bibtex": "bib", "markdown": "md", "excel": "xlsx", "endnote": "enl"}
 
 _TABLE_FORMATS = {"csv", "xlsx", "xls"}
 
+STANDARD_FIELDS = {
+    "ID",
+    "ENTRYTYPE",
+    "abstract",
+    "address",
+    "author",
+    "booktitle",
+    "chapter",
+    "container_title",
+    "colrev.dblp.dblp_key",
+    "colrev.semantic_scholar.id",
+    "colrev.web_of_science.unique-id",
+    "colrev_data_provenance",
+    "colrev_masterdata_provenance",
+    "colrev_origin",
+    "colrev_pdf_id",
+    "colrev_status",
+    "date",
+    "doi",
+    "edition",
+    "editor",
+    "fulltext",
+    "file",
+    "grobid-version",
+    "howpublished",
+    "institution",
+    "isbn",
+    "issn",
+    "journal",
+    "key",
+    "keywords",
+    "language",
+    "location",
+    "month",
+    "note",
+    "number",
+    "organization",
+    "pages",
+    "pmid",
+    "pubmed_id",
+    "publisher",
+    "prescreen_exclusion",
+    "school",
+    "series",
+    "screening_criteria",
+    "title",
+    "type",
+    "url",
+    "volume",
+    "year",
+}
+
 
 def normalize_field_name(
     value: str,
@@ -97,17 +149,16 @@ def normalize_source_record(
     return normalized
 
 
-def normalize_source_rows(
-    rows: list[dict[str, Any]],
-    *,
-    field_aliases: Mapping[str, str] | None = None,
-    format: str = "csv",
-) -> list[dict[str, Any]]:
-    """Normalize table rows while assigning standard bibliography fields."""
-    return [
-        normalize_source_record(row, format=format, field_aliases=field_aliases)
-        for row in rows
-    ]
+def namespace_unknown_fields(
+    records: list[dict[str, Any]], *, preserve_fields: frozenset[str] = frozenset()
+) -> None:
+    """Move non-standard source fields into the unknown-source namespace."""
+    for record in records:
+        for key in list(record):
+            if key not in STANDARD_FIELDS and key not in preserve_fields:
+                record[f"colrev.unknonwn_source.{normalize_field_name(str(key))}"] = (
+                    record.pop(key)
+                )
 
 
 def normalize_format(value: str) -> str:

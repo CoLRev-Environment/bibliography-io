@@ -5,10 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from bibliography_io import to_string
-from bibliography_io import load_raw
-from bibliography_io import loads_raw
-from bibliography_io import write
+from bibliography_io import load, load_raw, loads_raw, to_string, write
 from bibliography_io.exceptions import OptionalBackendUnavailableError
 
 DATA = Path(__file__).parents[1] / "data" / "md"
@@ -42,16 +39,18 @@ def _block_optional_markdown_dependencies(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_markdown_loader_uses_registered_backend(
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from bibliography_io import loads_raw
     from bibliography_io.loaders import markdown
 
+    locations: list[str | Path] = []
+
     class FakeBackend:
         @staticmethod
-        def loads(text: str, *, source: str) -> list[dict[str, str]]:
+        def loads(text: str, *, source: str | Path) -> list[dict[str, str]]:
             assert text == "A citation"
-            assert source == "<string>"
+            locations.append(source)
             return [{"ID": "1", "ENTRYTYPE": "article", "title": "Parsed"}]
 
     class FakeEntryPoint:
@@ -71,6 +70,11 @@ def test_markdown_loader_uses_registered_backend(
     assert loads_raw("A citation", format="md") == [
         {"ID": "1", "ENTRYTYPE": "article", "title": "Parsed"}
     ]
+
+    source = tmp_path / "references.md"
+    source.write_text("A citation", encoding="utf-8")
+    assert load(source) == [{"ID": "1", "ENTRYTYPE": "article", "title": "Parsed"}]
+    assert locations == ["<string>", source]
 
 
 def test_markdown_table_write(tmp_path: Path) -> None:

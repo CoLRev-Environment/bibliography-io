@@ -5,11 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..exceptions import BackendExecutionError
-from ..exceptions import OptionalBackendUnavailableError
-from ..exceptions import ParseError
-from ..exceptions import UnsupportedFormatError
-from ..normalization import normalize_loaded_records
+from ..exceptions import (
+    BackendExecutionError,
+    OptionalBackendUnavailableError,
+    ParseError,
+    UnsupportedFormatError,
+)
 
 
 def load_string(
@@ -19,10 +20,10 @@ def load_string(
     normalize: bool = True,
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
-    source: str | Path = "<string>",
+    location: str | Path = "<string>",
     header_only: bool = False,
 ) -> list[dict[str, Any]]:
-    """Load records from a string by dispatching to the format-specific loader."""
+    """Load text through a format loader, using location for Markdown context."""
     try:
         if format == "bib":
             from .bibtex import load_bibtex
@@ -31,40 +32,40 @@ def load_string(
                 string,
                 mapping_fields=mapping_fields,
                 list_fields=list_fields,
-                normalize=normalize,
+                normalize=False,
                 header_only=header_only,
             )
         elif format == "ris":
             from .ris import load_ris
 
-            result = load_ris(string, normalize=normalize)
+            result = load_ris(string, normalize=False)
         elif format in {"enl", "nbib", "txt"}:
             from .tagged import load_tagged
 
-            result = load_tagged(string, format=format, normalize=normalize)
+            result = load_tagged(string, format=format, normalize=False)
         elif format == "csv":
             from .tabular import load_csv
 
-            result = load_csv(string, normalize=normalize)
+            result = load_csv(string, normalize=False)
         elif format == "json":
             from .json import load_json
 
-            result = load_json(string, normalize=normalize)
+            result = load_json(string, normalize=False)
         elif format == "md":
             from .markdown import load_markdown
 
-            result = load_markdown(string, source=source, normalize=normalize)
+            result = load_markdown(string, location=location, normalize=False)
         else:
             raise UnsupportedFormatError(f"Reading {format} is unsupported")
-        return (
-            normalize_loaded_records(
-                result,
-                mapping_fields=mapping_fields,
-                list_fields=list_fields,
-                format=format,
-            )
-            if normalize
-            else result
+        if not normalize:
+            return result
+        from .. import _normalize_without_source
+
+        return _normalize_without_source(
+            result,
+            format_name=format,
+            mapping_fields=mapping_fields,
+            list_fields=list_fields,
         )
     except (BackendExecutionError, OptionalBackendUnavailableError, ParseError):
         raise

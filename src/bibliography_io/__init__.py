@@ -125,23 +125,59 @@ def _load_path_raw(
         normalize=False,
         mapping_fields=mappings,
         list_fields=lists,
-        source=path,
+        location=path,
     )
 
 
-def _normalize_generic_records(
-    records: list[dict[str, Any]], *, format_name: str
+def _normalize_without_source(
+    records: list[dict[str, Any]],
+    *,
+    format_name: str,
+    mapping_fields: frozenset[str] = frozenset(),
+    list_fields: frozenset[str] = frozenset(),
 ) -> list[dict[str, Any]]:
-    """Apply generic normalization, including tabular field aliases."""
-    from .normalization import normalize_loaded_records
+    """Dispatch no-source normalization to the format-specific loader."""
+    normalizer_options = {}
+    if format_name == "ris":
+        from .loaders.ris import normalize_without_source as format_normalizer
 
-    field_aliases = None
-    if format_name in {"csv", "xls", "xlsx"}:
-        from .loaders.tabular import TABULAR_FIELD_ALIASES
+    elif format_name == "bib":
+        from .loaders.bibtex import normalize_without_source as format_normalizer
 
-        field_aliases = TABULAR_FIELD_ALIASES
+        normalizer_options = {
+            "mapping_fields": mapping_fields,
+            "list_fields": list_fields,
+        }
+
+    elif format_name in {"csv", "xls", "xlsx"}:
+        from .loaders.tabular import normalize_without_source as format_normalizer
+
+    elif format_name in {"enl", "nbib", "txt"}:
+        from .loaders.tagged import normalize_without_source as format_normalizer
+
+    elif format_name == "json":
+        from .loaders.json import normalize_without_source as format_normalizer
+
+    elif format_name == "md":
+        from .loaders.markdown import normalize_without_source as format_normalizer
+
+    else:
+        raise UnsupportedFormatError(
+            f"No no-source normalizer is available for {format_name}"
+        )
+
+    if format_name in {"enl", "nbib", "txt"}:
+        records = format_normalizer(records, format=format_name)
+    else:
+        records = format_normalizer(records, **normalizer_options)
+    from .normalization import _records_from_loaded_list, normalize_loaded_records
+
+    normalized = _records_from_loaded_list(records, format=format_name)
     return normalize_loaded_records(
-        records, field_aliases=field_aliases, format=format_name
+        normalized,
+        mapping_fields=mapping_fields,
+        list_fields=list_fields,
+        format=format_name,
     )
 
 
@@ -193,7 +229,7 @@ def loads_raw(
         normalize=False,
         mapping_fields=mappings,
         list_fields=lists,
-        source="<string>",
+        location="<string>",
     )
 
 
@@ -359,7 +395,7 @@ def _load_text(
     source_version: str | None,
     location: str | Path,
 ) -> list[dict[str, Any]]:
-    """Load and normalize text through the generic or source-specific pipeline."""
+    """Load text through built-in format or source-plugin normalization."""
     if not isinstance(text, str):
         raise TypeError("input must be a string")
     if source is not None and (not isinstance(source, str) or not source.strip()):
@@ -376,7 +412,7 @@ def _load_text(
             normalize=True,
             mapping_fields=mappings,
             list_fields=lists,
-            source=location,
+            location=location,
         )
 
     plugin = _source_plugin(source)
@@ -398,7 +434,7 @@ def _load_text(
         normalize=False,
         mapping_fields=mappings,
         list_fields=lists,
-        source=location,
+        location=location,
     )
     return _normalize_source_records(
         records,
@@ -416,7 +452,7 @@ def loads(
     source: str | None = None,
     source_version: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Load and normalize records from text using a CoLRev source or fallback.
+    """Load and normalize text using built-in format or source-plugin rules.
 
     ``format`` is required because the input has no file suffix. ``xls`` and
     ``xlsx`` are not supported because they require file-based input.
@@ -446,9 +482,10 @@ def load(
     Use ``format`` when the suffix is ambiguous or does not match the file's
     actual format. When ``source`` is supplied, it selects the CoLRev
     search-source package with the matching endpoint identifier and applies its
-    preprocessing and normalization hooks. Otherwise, generic normalization is
-    applied. Both paths return string values for every field; repeated values
-    are combined and native non-string values are converted to strings. Use
+    preprocessing and normalization hooks. Otherwise, format-specific
+    no-source normalization is applied. Both paths return string values for
+    every field; repeated values are combined, and native non-string values
+    are converted to strings. Use
     :func:`loads` for text input, or :func:`load_raw` and :func:`loads_raw` for
     parser-level records.
     """
@@ -466,7 +503,12 @@ def load(
             records = _load_path_raw(
                 source_path, format_name, mappings=mappings, lists=lists
             )
-            return _normalize_generic_records(records, format_name=format_name)
+            return _normalize_without_source(
+                records,
+                format_name=format_name,
+                mapping_fields=mappings,
+                list_fields=lists,
+            )
         string = source_path.read_text(encoding="utf-8-sig")
         return _load_text(
             string,
@@ -551,7 +593,7 @@ def loads_primary(
         normalize=True,
         mapping_fields=mappings,
         list_fields=lists,
-        source="<string>",
+        location="<string>",
     )
     return _index_primary_records(records)
 
@@ -591,7 +633,7 @@ def load_primary(
             format_name,
             mapping_fields=mappings,
             list_fields=lists,
-            source=source,
+            location=source,
             header_only=True,
         )
     else:
@@ -599,7 +641,12 @@ def load_primary(
             records = _load_path_raw(
                 source, format_name, mappings=mappings, lists=lists
             )
-            records = _normalize_generic_records(records, format_name=format_name)
+            records = _normalize_without_source(
+                records,
+                format_name=format_name,
+                mapping_fields=mappings,
+                list_fields=lists,
+            )
             return _index_primary_records(records)
         string = source.read_text(encoding="utf-8-sig")
         from .loaders import load_string
@@ -610,7 +657,7 @@ def load_primary(
             normalize=True,
             mapping_fields=mappings,
             list_fields=lists,
-            source=source,
+            location=source,
         )
     return _index_primary_records(records)
 
