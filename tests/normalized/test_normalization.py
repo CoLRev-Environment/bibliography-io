@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from bibliography_io import get_nr_records, load_df, loads_raw
+from bibliography_io import get_nr_records, load, load_df, loads_raw
 from bibliography_io.loaders import load_string
 from bibliography_io.loaders.bibtex import BIBTEX_FIELD_ALIASES
 from bibliography_io.loaders.ris import RIS_FIELD_ALIASES
@@ -65,6 +65,31 @@ def test_loaders_apply_their_own_field_aliases() -> None:
 
     assert bibtex[0]["journal"] == "Journal"
     assert ris[0]["title"] == "Title"
+
+
+def test_generic_bibtex_load_preserves_colrev_fields_and_namespaces_unknown_once(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "records.bib"
+    source.write_text(
+        "@article{example, "
+        "colrev.google_scholar.uid={GS:123}, "
+        "colrev.files_dir.note={checked}, "
+        "custom-field={custom value}}",
+        encoding="utf-8",
+    )
+
+    records = load(source)
+
+    assert records == [
+        {
+            "ID": "example",
+            "ENTRYTYPE": "article",
+            "colrev.google_scholar.uid": "GS:123",
+            "colrev.files_dir.note": "checked",
+            "colrev.unknonwn_source.custom_field": "custom value",
+        }
+    ]
 
 
 def test_json_load_normalizes_multivalued_fields_by_default() -> None:

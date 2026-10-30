@@ -155,7 +155,11 @@ def namespace_unknown_fields(
     """Move non-standard source fields into the unknown-source namespace."""
     for record in records:
         for key in list(record):
-            if key not in STANDARD_FIELDS and key not in preserve_fields:
+            if (
+                key not in STANDARD_FIELDS
+                and key not in preserve_fields
+                and not str(key).startswith("colrev.")
+            ):
                 record[f"colrev.unknonwn_source.{normalize_field_name(str(key))}"] = (
                     record.pop(key)
                 )

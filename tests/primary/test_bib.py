@@ -105,6 +105,33 @@ def test_primary_writer_validates_ids_and_round_trips_structured_fields(
         write([{"ID": "one", "ENTRYTYPE": "article"}], path=output, primary=True)
 
 
+def test_primary_round_trips_preserve_colrev_extension_fields(tmp_path: Path) -> None:
+    source = tmp_path / "source.bib"
+    source.write_text(
+        "@article{example, "
+        "colrev.google_scholar.uid={GS:123}, "
+        "colrev.files_dir.note={checked}}",
+        encoding="utf-8",
+    )
+    output = tmp_path / "primary.bib"
+    records = bibio.load_primary(source)
+    expected = {
+        "example": {
+            "ID": "example",
+            "ENTRYTYPE": "article",
+            "colrev.google_scholar.uid": "GS:123",
+            "colrev.files_dir.note": "checked",
+        }
+    }
+
+    for _ in range(3):
+        assert records == expected
+        write(records, path=output, primary=True)
+        records = bibio.load_primary(output)
+
+    assert records == expected
+
+
 def test_primary_writer_sorts_ids_by_default(tmp_path: Path) -> None:
     records = {
         "z-last": {"ID": "z-last", "ENTRYTYPE": "article", "title": "Last"},
