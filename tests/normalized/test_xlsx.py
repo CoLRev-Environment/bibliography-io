@@ -16,6 +16,30 @@ def test_load_xlsx_fixture() -> None:
         load(ORIGINAL_DUPLICATE_FIXTURE)
 
 
+def test_load_xlsx_generic_normalization_preserves_explicit_id(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("pandas")
+    openpyxl = pytest.importorskip("openpyxl")
+    source = tmp_path / "records.xlsx"
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.append(["ID", "ENTRYTYPE", "title", "year"])
+    worksheet.append(["spreadsheet-1", "article", "A title", 2023])
+    workbook.save(source)
+
+    records = load(source)
+
+    assert records == {
+        "spreadsheet-1": {
+            "ID": "spreadsheet-1",
+            "ENTRYTYPE": "article",
+            "title": "A title",
+            "year": "2023",
+        }
+    }
+
+
 def test_xlsx_source_normalization_uses_parsed_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

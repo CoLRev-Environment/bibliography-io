@@ -4,12 +4,20 @@ from pathlib import Path
 
 import pytest
 
-from bibliography_io import load_raw
-from bibliography_io import write
+from bibliography_io import load_raw, write
 
 
 DATA = Path(__file__).parents[1] / "data" / "xlsx"
 ORIGINAL_DUPLICATE_FIXTURE = DATA / "load.xlsx"
+
+
+def test_xlsx_load_raw_preserves_source_columns() -> None:
+    records = load_raw(ORIGINAL_DUPLICATE_FIXTURE)
+
+    assert len(records) == 3
+    assert records[0]["ID"] == "Id_0001"
+    assert records[0]["Title"] == "Paper title"
+    assert records[0]["type"] == "article"
 
 
 def test_xlsx_load_write_round_trip(tmp_path: Path) -> None:

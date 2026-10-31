@@ -4,14 +4,20 @@ import csv
 from io import StringIO
 from pathlib import Path
 
-from bibliography_io import to_string
-from bibliography_io import load_raw
-from bibliography_io import loads_raw
-from bibliography_io import write
+from bibliography_io import load_raw, loads_raw, to_string, write
 from bibliography_io.writers.csv import write_csv
 
 
 DATA = Path(__file__).parents[1] / "data" / "csv"
+
+
+def test_csv_load_raw_preserves_source_headers() -> None:
+    records = load_raw(DATA / "load.csv")
+
+    assert len(records) == 2
+    assert records[0]["PMID"] == "11223344"
+    assert records[0]["Title"] == "Paper title"
+    assert records[0]["Publication Year"] == "2021"
 
 
 def test_csv_load_write_round_trip(tmp_path: Path) -> None:

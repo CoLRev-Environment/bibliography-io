@@ -2,13 +2,42 @@
 
 from pathlib import Path
 
-from bibliography_io import load
-from bibliography_io import loads
-from bibliography_io import load_raw
-from bibliography_io import write
+from bibliography_io import load, load_raw, loads, write
 from bibliography_io.loaders.ris import load_ris
 
 DATA = Path(__file__).parents[1] / "data" / "ris"
+
+
+def test_default_ris_entrytypes() -> None:
+    """Normalize known, unknown, and missing RIS reference types."""
+    for ris_type, expected in (
+        ("JOUR", "article"),
+        ("CONF", "inproceedings"),
+        ("UNLISTED", "misc"),
+        (None, "misc"),
+    ):
+        type_line = f"TY  - {ris_type}\n" if ris_type is not None else ""
+        records = loads(f"{type_line}ID  - test\nTI  - A title\nER  -\n", format="ris")
+        record = next(iter(records.values()))
+        assert record["ENTRYTYPE"] == expected
+        assert record["title"] == "A title"
+
+
+def test_default_ris_common_fields_and_precedence() -> None:
+    """Normalize common RIS fields and prefer TI over T1 when both occur."""
+    records = loads(
+        "TY  - JOUR\nID  - test\nTI  - Main title\nT1  - Other title\n"
+        "PY  - 2011\nAU  - Doe, Jane\nAU  - Roe, John\n"
+        "JO  - Main Journal\nDO  - 10.1000/test\nSP  - 10\nEP  - 20\nER  -\n",
+        format="ris",
+    )
+    record = records["000001"]
+    assert record["title"] == "Main title"
+    assert record["year"] == "2011"
+    assert record["author"] == "Doe, Jane and Roe, John"
+    assert record["journal"] == "Main Journal"
+    assert record["doi"] == "10.1000/test"
+    assert record["pages"] == "10--20"
 
 
 def test_load_ris_fixtures() -> None:

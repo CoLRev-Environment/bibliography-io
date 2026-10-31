@@ -9,11 +9,9 @@ from bibliography_io import loads, loads_raw, write_string
 from bibliography_io.loaders import load_string
 from bibliography_io.loaders.bibtex import BIBTEX_FIELD_ALIASES
 from bibliography_io.loaders.ris import RIS_FIELD_ALIASES
-from bibliography_io.normalization import (
-    normalize_field_name,
-    normalize_records,
-    normalize_source_record,
-)
+from bibliography_io.normalization import normalize_field_name
+from bibliography_io.normalization import normalize_records
+from bibliography_io.normalization import normalize_source_record
 from bibliography_io.writers.csv import write_csv
 
 

@@ -5,14 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..exceptions import (
-    BackendExecutionError,
-    DuplicateRecordIDError,
-    MissingRecordIDError,
-    OptionalBackendUnavailableError,
-    ParseError,
-    UnsupportedFormatError,
-)
+from ..exceptions import BackendExecutionError
+from ..exceptions import DuplicateRecordIDError
+from ..exceptions import MissingRecordIDError
+from ..exceptions import OptionalBackendUnavailableError
+from ..exceptions import ParseError
+from ..exceptions import UnsupportedFormatError
 
 
 def load_string(

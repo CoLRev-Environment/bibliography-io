@@ -2,8 +2,7 @@
 
 from pathlib import Path
 
-from bibliography_io import load_raw
-from bibliography_io import loads_raw
+from bibliography_io import load_raw, loads_raw
 
 
 DATA = Path(__file__).parents[1] / "data" / "nbib"
@@ -12,6 +11,8 @@ DATA = Path(__file__).parents[1] / "data" / "nbib"
 def test_load_nbib_non_normalized_retains_source_tags() -> None:
     records = load_raw(DATA / "load.nbib")
 
+    assert records[0]["ENTRYTYPE"] == "article"
+    assert records[0]["TI"] == "Paper title"
     assert records[0]["AU"] == ["Smith, Tom", "Hunter, Shawn"]
     assert records[0]["OT"] == ["Keyword 1", "Keyword 2", "Keyword 3"]
     assert records[0]["DP"] == "2000"
