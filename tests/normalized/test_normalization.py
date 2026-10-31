@@ -96,7 +96,12 @@ def test_writer_does_not_apply_generic_normalization() -> None:
 
 def test_loaders_apply_their_own_field_aliases() -> None:
     bibtex = load_string(
-        "@article{sample, journaltitle={Journal}}", format="bib", normalize=True
+        """\
+@article{sample,
+  journaltitle={Journal},
+}""",
+        format="bib",
+        normalize=True,
     )
     ris = load_string("TY  - JOUR\nT1  - Title\nER  -", format="ris", normalize=True)
 
@@ -107,12 +112,12 @@ def test_loaders_apply_their_own_field_aliases() -> None:
 def test_generic_bibtex_load_preserves_namespaced_and_unknown_field_names(
     tmp_path: Path,
 ) -> None:
-    text = (
-        "@article{example, "
-        "colrev.google_scholar.uid={GS:123}, "
-        "colrev.files_dir.note={checked}, "
-        "custom-field={custom value}}"
-    )
+    text = """\
+@article{example,
+  colrev.google_scholar.uid={GS:123},
+  colrev.files_dir.note={checked},
+  custom-field={custom value},
+}"""
     source = tmp_path / "records.bib"
     source.write_text(text, encoding="utf-8")
 
@@ -195,7 +200,13 @@ def test_load_df_preserves_normalized_record_order(tmp_path: Path) -> None:
 
     source = tmp_path / "records.bib"
     source.write_text(
-        "@article{second, title={Second}}\n@book{first, title={First}}",
+        """\
+@article{second,
+  title={Second},
+}
+@book{first,
+  title={First},
+}""",
         encoding="utf-8",
     )
 

@@ -16,7 +16,14 @@ class _RecordState(Enum):
 
 def test_primary_dict_loads_index_by_id_and_reject_duplicates() -> None:
     records = bibio.loads_primary(
-        "@article{one, title={First}}\n@book{two, title={Second}}", format="bib"
+        """\
+@article{one,
+  title={First},
+}
+@book{two,
+  title={Second},
+}""",
+        format="bib",
     )
     assert list(records) == ["one", "two"]
     assert records["one"]["ENTRYTYPE"] == "article"
@@ -24,7 +31,13 @@ def test_primary_dict_loads_index_by_id_and_reject_duplicates() -> None:
 
     with pytest.raises(bibio.DuplicateRecordIDError):
         bibio.loads_primary(
-            "@article{same, title={First}}\n@book{same, title={Second}}",
+            """\
+@article{same,
+  title={First},
+}
+@book{same,
+  title={Second},
+}""",
             format="bib",
         )
 
@@ -32,7 +45,11 @@ def test_primary_dict_loads_index_by_id_and_reject_duplicates() -> None:
 def test_primary_dict_header_only_skips_fields(tmp_path: Path) -> None:
     source = tmp_path / "headers.bib"
     source.write_text(
-        "@article{one,\n title={A title},\n provenance={not-structured}\n}",
+        """\
+@article{one,
+  title={A title},
+  provenance={not-structured},
+}""",
         encoding="utf-8",
     )
 
@@ -46,7 +63,8 @@ def test_primary_dict_header_only_skips_fields(tmp_path: Path) -> None:
 def test_primary_dict_header_only_extracts_record_headers(tmp_path: Path) -> None:
     source = tmp_path / "record-headers.bib"
     source.write_text(
-        """@article{one,
+        """\
+@article{one,
  title={A title},
  colrev_origin={source-one; source-two;},
  colrev_status={rev_included},
@@ -152,13 +170,15 @@ def test_primary_update_converts_enum_field_values(tmp_path: Path) -> None:
 def test_primary_round_trips_preserve_custom_and_legacy_fields(tmp_path: Path) -> None:
     source = tmp_path / "source.bib"
     source.write_text(
-        "@article{example, "
-        "colrev.google_scholar.uid={GS:123}, "
-        "colrev.files_dir.note={checked}, "
-        "pubmedid={PMID:456}, "
-        "metadata_source_repository_paths={repository/path}, "
-        "legacy-custom-field={kept}, "
-        "journaltitle={Journal}}",
+        """\
+@article{example,
+  colrev.google_scholar.uid={GS:123},
+  colrev.files_dir.note={checked},
+  pubmedid={PMID:456},
+  metadata_source_repository_paths={repository/path},
+  legacy-custom-field={kept},
+  journaltitle={Journal},
+}""",
         encoding="utf-8",
     )
     output = tmp_path / "primary.bib"
@@ -189,7 +209,11 @@ def test_primary_load_preserves_custom_field_spelling_and_standard_alias(
 ) -> None:
     source = tmp_path / "custom-fields.bib"
     source.write_text(
-        "@article{example, legacy-custom-field={kept}, journaltitle={Journal}}",
+        """\
+@article{example,
+  legacy-custom-field={kept},
+  journaltitle={Journal},
+}""",
         encoding="utf-8",
     )
 
@@ -312,7 +336,13 @@ def test_primary_dataframe_is_indexed_by_record_id(tmp_path: Path) -> None:
     pytest.importorskip("pandas")
     source = tmp_path / "records.bib"
     source.write_text(
-        "@article{second, title={Second}}\n@book{first, title={First}}",
+        """\
+@article{second,
+  title={Second},
+}
+@book{first,
+  title={First},
+}""",
         encoding="utf-8",
     )
 

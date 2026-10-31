@@ -1,5 +1,6 @@
 """Tests for BibTeX file APIs using format-specific fixtures."""
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,8 @@ from bibliography_io.exceptions import ParseError
 from bibliography_io.exceptions import RecordValidationError
 from bibliography_io.exceptions import SerializationError
 from bibliography_io.exceptions import UnsupportedFormatError
+from bibliography_io.loaders.bibtex import run_fix_bib_file
+from bibliography_io.loaders.bibtex import run_resolve_crossref
 
 DATA = Path(__file__).parents[1] / "data" / "bib"
 ORIGINAL_DUPLICATE_FIXTURE = DATA / "load.bib"
@@ -71,10 +74,21 @@ def test_update_replaces_matching_records_and_preserves_other_bytes(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "records.bib"
-    untouched = b"@misc{keep,\n   title = {Keep exactly},\n}\n\n"
+    untouched = b"""\
+@misc{keep,
+   title = {Keep exactly},
+}
+
+"""
     path.write_bytes(
         b"% bibliography header\n"
-        b"@article{replace,\n   title = {Old},\n}\n\n" + untouched
+        + b"""\
+@article{replace,
+   title = {Old},
+}
+
+"""
+        + untouched
     )
 
     update(
@@ -96,7 +110,13 @@ def test_update_replaces_matching_records_and_preserves_other_bytes(
 
 def test_update_appends_records_missing_from_file(tmp_path: Path) -> None:
     path = tmp_path / "records.bib"
-    path.write_text("@misc{existing,\n}\n", encoding="utf-8")
+    path.write_text(
+        """\
+@misc{existing,
+}
+""",
+        encoding="utf-8",
+    )
 
     update(
         path,
@@ -111,8 +131,14 @@ def test_update_appends_records_missing_from_file(tmp_path: Path) -> None:
 def test_update_handles_shorter_replacement(tmp_path: Path) -> None:
     path = tmp_path / "records.bib"
     path.write_text(
-        "@article{replace,\n   title = {A very long old value},\n}\n\n"
-        "@misc{keep,\n   title = {Keep},\n}",
+        """\
+@article{replace,
+   title = {A very long old value},
+}
+
+@misc{keep,
+   title = {Keep},
+}""",
         encoding="utf-8",
     )
 
@@ -491,7 +517,10 @@ def test_malformed_bibtex_raises_parse_error() -> None:
 
 
 def test_bibtex_dotted_field_names_are_preserved_when_loading() -> None:
-    text = "@article{example, colrev.vendor.identifier={abc123}}"
+    text = """\
+@article{example,
+  colrev.vendor.identifier={abc123},
+}"""
 
     parsed = loads_raw(text, format="bib")
 
@@ -640,7 +669,10 @@ def test_undeclared_structures_keep_writing_error() -> None:
 
 
 def test_malformed_declared_provenance_mapping_raises_parse_error() -> None:
-    text = "@misc{example, provenance={author:source-without-terminator}}"
+    text = """\
+@misc{example,
+  provenance={author:source-without-terminator},
+}"""
     with pytest.raises(ParseError, match="Malformed provenance mapping"):
         loads_raw(text, format="bib", mapping_fields=["provenance"])
 
@@ -711,9 +743,148 @@ def test_raw_file_writer_uses_legacy_mapping_and_list_formats(tmp_path: Path) ->
 
 def test_raw_bibtex_preserves_missing_duplicate_and_hash_ids() -> None:
     records = loads_raw(
-        "@article{same#key, title={First}}\n@article{same#key, title={Second}}",
+        """\
+@article{same#key,
+  title={First},
+}
+@article{same#key,
+  title={Second},
+}""",
         format="bib",
     )
     assert [record.get("ID") for record in records] == ["same#key", "same#key"]
     assert [record["title"] for record in records] == ["First", "Second"]
     assert loads_raw('[{"title": "No ID"}]', format="json")[0].get("ID") is None
+
+
+def test_resolve_crossref_inherits_parent_fields_and_removes_parent(caplog) -> None:
+    records = {
+        "child": {
+            "ID": "child",
+            "ENTRYTYPE": "inproceedings",
+            "crossref": "proceedings",
+            "title": "Child title",
+        },
+        "proceedings": {
+            "ID": "proceedings",
+            "ENTRYTYPE": "proceedings",
+            "booktitle": "Conference",
+            "title": "Parent title",
+        },
+        "standalone": {"ID": "standalone", "ENTRYTYPE": "article"},
+    }
+
+    run_resolve_crossref(records, logger=logging.getLogger(__name__))
+
+    assert records == {
+        "child": {
+            "ID": "child",
+            "ENTRYTYPE": "inproceedings",
+            "title": "Child title",
+            "booktitle": "Conference",
+        },
+        "standalone": {"ID": "standalone", "ENTRYTYPE": "article"},
+    }
+
+
+def test_resolve_crossref_logs_and_preserves_child_for_missing_parent(caplog) -> None:
+    records = {"child": {"ID": "child", "crossref": "missing"}}
+
+    run_resolve_crossref(records, logger=logging.getLogger(__name__))
+
+    assert records == {"child": {"ID": "child", "crossref": "missing"}}
+    assert "crossref record (ID=missing) not found" in caplog.text
+
+
+def test_resolve_crossref_removes_shared_parent_only_once() -> None:
+    records = {
+        "first": {"ID": "first", "crossref": "parent"},
+        "second": {"ID": "second", "crossref": "parent"},
+        "parent": {"ID": "parent", "booktitle": "Conference"},
+    }
+
+    run_resolve_crossref(records, logger=logging.getLogger(__name__))
+
+    assert records == {
+        "first": {"ID": "first", "booktitle": "Conference"},
+        "second": {"ID": "second", "booktitle": "Conference"},
+    }
+
+
+def test_fix_bib_file_repairs_citation_keys_and_field_names(
+    tmp_path: Path, caplog
+) -> None:
+    caplog.set_level(logging.INFO)
+    path = tmp_path / "malformed.bib"
+    path.write_text(
+        """\
+@article{first;key,
+  author name = {Example, Alex},
+  title={Preserve this field},
+}
+@article{second key,
+  title={Another entry},
+}
+""",
+        encoding="utf-8",
+    )
+
+    run_fix_bib_file(path, logger=logging.getLogger(__name__))
+
+    repaired = path.read_text(encoding="utf-8")
+    assert "@article{first_key," in repaired
+    assert "author_name = {Example, Alex}," in repaired
+    assert "title={Preserve this field}," in repaired
+    assert "@article{second_key," in repaired
+    assert "title={Another entry}," in repaired
+    assert "Fix invalid key" in caplog.text
+
+
+def test_fix_bib_file_adds_alphabetic_suffix_to_duplicate_ids(
+    tmp_path: Path, caplog
+) -> None:
+    caplog.set_level(logging.INFO)
+    path = tmp_path / "duplicates.bib"
+    path.write_text(
+        """\
+@article{same,
+  title={First},
+}
+@article{same,
+  title={Second},
+}
+@article{samea,
+  title={Already suffixed},
+}
+@article{same,
+  title={Third},
+}
+""",
+        encoding="utf-8",
+    )
+
+    run_fix_bib_file(path, logger=logging.getLogger(__name__))
+
+    repaired = path.read_text(encoding="utf-8")
+    assert [
+        line.split("{", 1)[1].split(",", 1)[0]
+        for line in repaired.splitlines()
+        if line.startswith("@article{")
+    ] == ["same", "samea", "sameaa", "sameb"]
+    assert "title={First}" in repaired
+    assert "title={Second}" in repaired
+    assert "title={Third}" in repaired
+    assert "Fix duplicate ID: same >> samea" in caplog.text
+    assert "Fix duplicate ID: same >> sameb" in caplog.text
+
+
+@pytest.mark.parametrize("contents", ["", "short"])
+def test_fix_bib_file_leaves_short_files_unchanged(
+    tmp_path: Path, contents: str
+) -> None:
+    path = tmp_path / "short.bib"
+    path.write_text(contents, encoding="utf-8")
+
+    run_fix_bib_file(path, logger=logging.getLogger(__name__))
+
+    assert path.read_text(encoding="utf-8") == contents

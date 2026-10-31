@@ -37,7 +37,10 @@ import sys
 sys.path.insert(0, sys.argv[1])
 import bibliography_io
 records = bibliography_io.loads_raw(
-    "@article{sample, title={Standalone}}", format="bib"
+    '''\
+@article{sample,
+  title={Standalone},
+}''', format="bib"
 )
 assert records[0]["title"] == "Standalone"
 """
@@ -241,7 +244,13 @@ def test_missing_source_plugin_raises_optional_backend_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "records.bib"
-    source.write_text("@article{one, title={Title}}", encoding="utf-8")
+    source.write_text(
+        """\
+@article{one,
+  title={Title},
+}""",
+        encoding="utf-8",
+    )
 
     class Points:
         @staticmethod
@@ -262,7 +271,13 @@ def test_duplicate_source_endpoints_raise_backend_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "records.bib"
-    source.write_text("@article{one, title={Title}}", encoding="utf-8")
+    source.write_text(
+        """\
+@article{one,
+  title={Title},
+}""",
+        encoding="utf-8",
+    )
 
     class Plugin:
         endpoint = "colrev.provider_x"
@@ -298,7 +313,13 @@ import bibliography_io
 from bibliography_io.exceptions import OptionalBackendUnavailableError
 with tempfile.TemporaryDirectory() as directory:
     source = Path(directory) / "records.bib"
-    source.write_text("@article{one, title={One}}", encoding="utf-8")
+    source.write_text(
+        '''\
+@article{one,
+  title={One},
+}''',
+        encoding="utf-8",
+    )
     for loader in (
         bibliography_io.load_df,
         bibliography_io.load_primary_df,
