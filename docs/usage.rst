@@ -126,10 +126,14 @@ the Excel extra with ``pip install bibliography-io[excel]`` to use these helpers
 Raw records have not been curated as primary records. Normalization belongs to
 ``load()`` and is generic unless a source is selected. Formats retain their own
 limits on what parser-level information can be represented. Unlike ``load()``,
-``load_primary()`` and ``loads_primary()`` retain mapping and list values only
-for BibTeX fields explicitly declared with ``mapping_fields`` and
-``list_fields``; all other field values are strings. The declarations define
-how those BibTeX fields are parsed, and do not change the behavior of ``load()``.
+``load_primary()`` and ``loads_primary()`` assume records are already
+controlled: IDs are unique, non-empty strings; ``ENTRYTYPE`` values are valid,
+non-empty strings; and ordinary field values are strings. Other value types
+raise ``RecordValidationError`` rather than being stringified, combined,
+deduplicated, or removed. Mapping and list values are retained only for BibTeX
+fields explicitly declared with ``mapping_fields`` and ``list_fields``. These
+declarations do not change the behavior of ``load()``. The same value contract
+applies when writing a mapping with ``primary=True``.
 
 Format examples
 ---------------

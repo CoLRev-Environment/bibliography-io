@@ -4,7 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from bibliography_io import get_nr_records, load, load_df, loads_raw
+from bibliography_io import (
+    get_nr_records,
+    load,
+    load_df,
+    loads,
+    loads_raw,
+    write_string,
+)
 from bibliography_io.loaders import load_string
 from bibliography_io.loaders.bibtex import BIBTEX_FIELD_ALIASES
 from bibliography_io.loaders.ris import RIS_FIELD_ALIASES
@@ -57,6 +64,36 @@ def test_normalize_records_accepts_explicit_field_aliases() -> None:
     assert "authors" not in records["one"]
 
 
+def test_generic_normalization_preserves_unknown_names_and_skips_inference() -> None:
+    assert normalize_source_record(
+        {"Custom Field": "value", "authors": "Ada", "journal_book": "Venue"},
+        field_aliases={"authors": "author"},
+        generic_normalization=True,
+    ) == {
+        "Custom Field": "value",
+        "author": "Ada",
+        "journal_book": "Venue",
+    }
+    assert normalize_source_record({"Custom Field": "value"}) == {
+        "custom_field": "value"
+    }
+
+
+def test_writer_does_not_apply_generic_normalization() -> None:
+    output = write_string(
+        {
+            "example": {
+                "ID": "example",
+                "ENTRYTYPE": "misc",
+                "Custom Field": "value",
+            }
+        },
+        "csv",
+    )
+
+    assert output.splitlines()[0] == "ID,ENTRYTYPE,custom_field"
+
+
 def test_loaders_apply_their_own_field_aliases() -> None:
     bibtex = load_string(
         "@article{sample, journaltitle={Journal}}", format="bib", normalize=True
@@ -67,29 +104,30 @@ def test_loaders_apply_their_own_field_aliases() -> None:
     assert ris[0]["title"] == "Title"
 
 
-def test_generic_bibtex_load_preserves_colrev_fields_and_namespaces_unknown_once(
+def test_generic_bibtex_load_preserves_namespaced_and_unknown_field_names(
     tmp_path: Path,
 ) -> None:
-    source = tmp_path / "records.bib"
-    source.write_text(
+    text = (
         "@article{example, "
         "colrev.google_scholar.uid={GS:123}, "
         "colrev.files_dir.note={checked}, "
-        "custom-field={custom value}}",
-        encoding="utf-8",
+        "custom-field={custom value}}"
     )
+    source = tmp_path / "records.bib"
+    source.write_text(text, encoding="utf-8")
 
-    records = load(source)
-
-    assert records == [
+    expected = [
         {
             "ID": "example",
             "ENTRYTYPE": "article",
             "colrev.google_scholar.uid": "GS:123",
             "colrev.files_dir.note": "checked",
-            "colrev.unknonwn_source.custom_field": "custom value",
+            "custom-field": "custom value",
         }
     ]
+
+    assert load(source) == expected
+    assert loads(text, format="bib") == expected
 
 
 def test_json_load_normalizes_multivalued_fields_by_default() -> None:

@@ -11,7 +11,8 @@ from typing import Any
 from ..exceptions import OptionalBackendUnavailableError
 from ..exceptions import ParseError
 from ..normalization import _records_from_un_normalized_list
-from ..normalization import namespace_unknown_fields
+from ..normalization import STANDARD_FIELDS
+from ..normalization import normalize_field_name
 
 TABULAR_FIELD_ALIASES = {
     "authors": "author",
@@ -23,9 +24,33 @@ TABULAR_FIELD_ALIASES = {
 
 
 def normalize_without_source(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Apply no-source tabular mappings and unknown-field namespacing."""
+    """Apply known tabular mappings while preserving unknown field names."""
     for index, record in enumerate(records, start=1):
-        lowered = {str(key).lower(): value for key, value in record.items()}
+        lowered = {}
+        for key, value in record.items():
+            original_name = str(key)
+            lowered_name = normalize_field_name(original_name)
+            known_name = (
+                lowered_name in STANDARD_FIELDS
+                or lowered_name in TABULAR_FIELD_ALIASES
+                or lowered_name
+                in {
+                    "id",
+                    "entrytype",
+                    "type",
+                    "authors",
+                    "publication",
+                    "category",
+                    "affiliations",
+                    "journal_book",
+                    "number_of_cited_references",
+                    "file_name",
+                    "cited_by",
+                    "author_count",
+                    "citation_key",
+                }
+            )
+            lowered[lowered_name if known_name else original_name] = value
         record.clear()
         record.update(lowered)
         for source, target in TABULAR_FIELD_ALIASES.items():
@@ -89,7 +114,6 @@ def normalize_without_source(records: list[dict[str, Any]]) -> list[dict[str, An
                 record.pop(key)
             else:
                 record[key] = str(value)
-    namespace_unknown_fields(records)
     return records
 
 

@@ -8,13 +8,17 @@ from typing import Any
 from ..exceptions import ParseError
 from ..normalization import _records_from_un_normalized_list
 from ..normalization import normalize_field_name
-from ..normalization import namespace_unknown_fields
 
 _NBIB_FIELD_MAP = {
     "TI": "title",
     "AU": "author",
+    "OWN": "own",
     "DP": "year",
     "JT": "journal",
+    "SO": "so",
+    "OID": "oid",
+    "LID": "lid",
+    "LA": "la",
     "VI": "volume",
     "IP": "number",
     "AB": "abstract",
@@ -80,7 +84,7 @@ def normalize_without_source(
                         else normalize_field_name(str(value))
                     )
                 else:
-                    target = _NBIB_FIELD_MAP.get(tag, normalize_field_name(tag))
+                    target = _NBIB_FIELD_MAP.get(tag, tag)
                 _append_normalized_value(record, target, value)
     elif format == "enl":
         for index, record in enumerate(records, start=1):
@@ -99,7 +103,6 @@ def normalize_without_source(
                     record[target] = record.pop(source)
             record.pop("type", None)
             record.setdefault("ID", str(index))
-        namespace_unknown_fields(records)
     elif format == "txt":
         for record in records:
             for tag in list(record):
@@ -111,7 +114,7 @@ def normalize_without_source(
                 elif tag == "8":
                     record["date"] = value
                 else:
-                    target = _TXT_FIELD_MAP.get(tag, normalize_field_name(tag))
+                    target = _TXT_FIELD_MAP.get(tag, tag)
                     _append_normalized_value(record, target, value)
     else:
         raise ValueError(f"Unsupported tagged format: {format}")

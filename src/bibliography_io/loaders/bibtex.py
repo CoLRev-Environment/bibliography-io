@@ -8,7 +8,6 @@ from typing import Any
 from ..constants import Fields
 from ..exceptions import ParseError
 from ..normalization import _records_from_un_normalized_list
-from ..normalization import namespace_unknown_fields
 from ..normalization import normalize_source_record
 
 BIBTEX_FIELD_ALIASES = {
@@ -23,17 +22,19 @@ def normalize_without_source(
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
 ) -> list[dict[str, Any]]:
-    """Apply no-source entry-type and unknown-field normalization to BibTeX."""
+    """Normalize standard BibTeX fields while preserving unknown field names."""
     for index, record in enumerate(records):
         records[index] = normalize_source_record(
-            record, format="bib", field_aliases=BIBTEX_FIELD_ALIASES
+            record,
+            format="bib",
+            field_aliases=BIBTEX_FIELD_ALIASES,
+            generic_normalization=True,
         )
         record = records[index]
         record.setdefault("ENTRYTYPE", "misc")
         record["ENTRYTYPE"] = str(record["ENTRYTYPE"]).lower()
         if record["ENTRYTYPE"] in {"www", "electronic"}:
             record["ENTRYTYPE"] = "misc"
-    namespace_unknown_fields(records, preserve_fields=mapping_fields | list_fields)
     return records
 
 

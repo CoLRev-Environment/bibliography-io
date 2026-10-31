@@ -1,11 +1,17 @@
 """Tests for the BibTeX-only primary-record API."""
 
+from enum import Enum
 from pathlib import Path
 
 import pytest
 
 import bibliography_io as bibio
-from bibliography_io import write
+from bibliography_io import update, write
+
+
+class _RecordState(Enum):
+    MD_IMPORTED = "md_imported"
+    NUMERIC_STATE = 17
 
 
 def test_primary_dict_loads_index_by_id_and_reject_duplicates() -> None:
@@ -105,12 +111,54 @@ def test_primary_writer_validates_ids_and_round_trips_structured_fields(
         write([{"ID": "one", "ENTRYTYPE": "article"}], path=output, primary=True)
 
 
-def test_primary_round_trips_preserve_colrev_extension_fields(tmp_path: Path) -> None:
+def test_primary_writer_converts_enum_field_values_to_member_names(
+    tmp_path: Path,
+) -> None:
+    records = {
+        "one": {
+            "ID": "one",
+            "ENTRYTYPE": "article",
+            "colrev_status": _RecordState.MD_IMPORTED,
+            "workflow_state": _RecordState.NUMERIC_STATE,
+        }
+    }
+    output = tmp_path / "primary.bib"
+
+    write(records, path=output, primary=True)
+
+    loaded = bibio.load_primary(output)["one"]
+    assert loaded["colrev_status"] == "MD_IMPORTED"
+    assert loaded["workflow_state"] == "NUMERIC_STATE"
+    assert records["one"]["colrev_status"] is _RecordState.MD_IMPORTED
+    assert records["one"]["workflow_state"] is _RecordState.NUMERIC_STATE
+
+
+def test_primary_update_converts_enum_field_values(tmp_path: Path) -> None:
+    records = {
+        "one": {
+            "ID": "one",
+            "ENTRYTYPE": "article",
+            "review_state": _RecordState.NUMERIC_STATE,
+        }
+    }
+    output = tmp_path / "primary.bib"
+
+    update(output, records)
+
+    assert bibio.load_primary(output)["one"]["review_state"] == "NUMERIC_STATE"
+    assert records["one"]["review_state"] is _RecordState.NUMERIC_STATE
+
+
+def test_primary_round_trips_preserve_custom_and_legacy_fields(tmp_path: Path) -> None:
     source = tmp_path / "source.bib"
     source.write_text(
         "@article{example, "
         "colrev.google_scholar.uid={GS:123}, "
-        "colrev.files_dir.note={checked}}",
+        "colrev.files_dir.note={checked}, "
+        "pubmedid={PMID:456}, "
+        "metadata_source_repository_paths={repository/path}, "
+        "legacy-custom-field={kept}, "
+        "journaltitle={Journal}}",
         encoding="utf-8",
     )
     output = tmp_path / "primary.bib"
@@ -121,6 +169,10 @@ def test_primary_round_trips_preserve_colrev_extension_fields(tmp_path: Path) ->
             "ENTRYTYPE": "article",
             "colrev.google_scholar.uid": "GS:123",
             "colrev.files_dir.note": "checked",
+            "pubmedid": "PMID:456",
+            "metadata_source_repository_paths": "repository/path",
+            "legacy-custom-field": "kept",
+            "journaltitle": "Journal",
         }
     }
 
@@ -130,6 +182,48 @@ def test_primary_round_trips_preserve_colrev_extension_fields(tmp_path: Path) ->
         records = bibio.load_primary(output)
 
     assert records == expected
+
+
+def test_primary_load_preserves_custom_field_spelling_and_standard_alias(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "custom-fields.bib"
+    source.write_text(
+        "@article{example, legacy-custom-field={kept}, journaltitle={Journal}}",
+        encoding="utf-8",
+    )
+
+    expected = {
+        "example": {
+            "ID": "example",
+            "ENTRYTYPE": "article",
+            "legacy-custom-field": "kept",
+            "journaltitle": "Journal",
+        }
+    }
+
+    assert bibio.load_primary(source) == expected
+    assert bibio.loads_primary(source.read_text(encoding="utf-8"), format="bib") == (
+        expected
+    )
+
+
+def test_primary_writer_and_update_keep_custom_field_names(tmp_path: Path) -> None:
+    records = {
+        "example": {
+            "ID": "example",
+            "ENTRYTYPE": "article",
+            "legacy-custom-field": "kept",
+            "pubmedid": "PMID:456",
+        }
+    }
+    output = tmp_path / "primary.bib"
+
+    write(records, path=output, primary=True)
+    assert bibio.load_primary(output) == records
+
+    update(output, records)
+    assert bibio.load_primary(output) == records
 
 
 def test_primary_writer_sorts_ids_by_default(tmp_path: Path) -> None:
@@ -166,23 +260,52 @@ def test_load_primary_empty_and_missing_files(tmp_path: Path) -> None:
     assert bibio.load_primary(tmp_path / "missing.bib") == {}
 
 
-def test_primary_undeclared_native_values_are_strings(tmp_path: Path) -> None:
+def test_primary_loader_rejects_undeclared_non_string_values(tmp_path: Path) -> None:
     source = tmp_path / "primary.json"
     source.write_text(
         '[{"ID":"one","ENTRYTYPE":"article","title":42,"metadata":{"rank":2}}]',
         encoding="utf-8",
     )
 
-    records = bibio.load_primary(source)
+    with pytest.raises(
+        bibio.RecordValidationError,
+        match="primary record 'one' field 'title' must be a string",
+    ):
+        bibio.load_primary(source)
 
-    assert records == {
+
+def test_primary_loader_requires_entrytype(tmp_path: Path) -> None:
+    source = tmp_path / "missing-entrytype.json"
+    source.write_text('[{"ID":"one","title":"Title"}]', encoding="utf-8")
+
+    with pytest.raises(bibio.RecordValidationError, match="invalid ENTRYTYPE"):
+        bibio.load_primary(source)
+
+
+def test_primary_writer_rejects_undeclared_non_string_values(tmp_path: Path) -> None:
+    records = {
         "one": {
             "ID": "one",
             "ENTRYTYPE": "article",
-            "title": "42",
-            "metadata": "{'rank': 2}",
+            "title": 42,
         }
     }
+
+    with pytest.raises(
+        bibio.RecordValidationError,
+        match="primary record 'one' field 'title' must be a string",
+    ):
+        write(records, path=tmp_path / "primary.bib", primary=True)
+
+
+def test_primary_update_rejects_undeclared_non_string_values(tmp_path: Path) -> None:
+    records = {"one": {"ID": "one", "ENTRYTYPE": "article", "title": 42}}
+
+    with pytest.raises(
+        bibio.RecordValidationError,
+        match="primary record 'one' field 'title' must be a string",
+    ):
+        bibio.update(tmp_path / "primary.bib", records)
 
 
 def test_primary_dataframe_is_indexed_by_record_id(tmp_path: Path) -> None:

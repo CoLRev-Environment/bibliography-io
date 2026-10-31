@@ -7,7 +7,6 @@ from typing import Any
 
 from ..exceptions import ParseError
 from ..normalization import _records_from_un_normalized_list
-from ..normalization import namespace_unknown_fields
 
 RIS_MAP = {
     "TI": "title",
@@ -55,7 +54,7 @@ _RIS_NO_SOURCE_TYPES = {
 
 
 def normalize_without_source(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Apply no-source field mappings and unknown-field namespacing to RIS records."""
+    """Map recognized RIS tags while preserving unknown tags."""
     field_map = {
         "TI": "title",
         "T1": "title",
@@ -118,7 +117,6 @@ def normalize_without_source(records: list[dict[str, Any]]) -> list[dict[str, An
         for key in ("C1", "T3", "AD", "CY", "M3", "ER", "Y2", "DB"):
             record.pop(key, None)
         record["ID"] = str(index).zfill(6)
-    namespace_unknown_fields(records)
     return records
 
 

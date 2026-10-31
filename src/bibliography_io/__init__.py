@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from enum import Enum
 from importlib.metadata import entry_points
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -21,7 +22,6 @@ from .normalization import normalize_field_name
 from .normalization import normalize_format
 from .normalization import normalize_loaded_record_values
 from .normalization import normalize_records
-from .normalization import normalize_source_record
 from .normalization import sort_records_by_id
 
 
@@ -137,47 +137,56 @@ def _normalize_without_source(
     list_fields: frozenset[str] = frozenset(),
 ) -> list[dict[str, Any]]:
     """Dispatch no-source normalization to the format-specific loader."""
-    normalizer_options = {}
     if format_name == "ris":
         from .loaders.ris import normalize_without_source as format_normalizer
+
+        records = format_normalizer(records)
 
     elif format_name == "bib":
         from .loaders.bibtex import normalize_without_source as format_normalizer
 
-        normalizer_options = {
-            "mapping_fields": mapping_fields,
-            "list_fields": list_fields,
-        }
+        records = format_normalizer(
+            records, mapping_fields=mapping_fields, list_fields=list_fields
+        )
 
     elif format_name in {"csv", "xls", "xlsx"}:
         from .loaders.tabular import normalize_without_source as format_normalizer
 
+        records = format_normalizer(records)
+
     elif format_name in {"enl", "nbib", "txt"}:
         from .loaders.tagged import normalize_without_source as format_normalizer
+
+        records = format_normalizer(records, format=format_name)
 
     elif format_name == "json":
         from .loaders.json import normalize_without_source as format_normalizer
 
+        records = format_normalizer(records)
+
     elif format_name == "md":
         from .loaders.markdown import normalize_without_source as format_normalizer
+
+        records = format_normalizer(records)
 
     else:
         raise UnsupportedFormatError(
             f"No no-source normalizer is available for {format_name}"
         )
 
-    if format_name in {"enl", "nbib", "txt"}:
-        records = format_normalizer(records, format=format_name)
-    else:
-        records = format_normalizer(records, **normalizer_options)
     from .normalization import _records_from_loaded_list, normalize_loaded_records
 
-    normalized = _records_from_loaded_list(records, format=format_name)
+    normalized = _records_from_loaded_list(
+        records,
+        format=format_name,
+        generic_normalization=True,
+    )
     return normalize_loaded_records(
         normalized,
         mapping_fields=mapping_fields,
         list_fields=list_fields,
         format=format_name,
+        generic_normalization=True,
     )
 
 
@@ -323,10 +332,7 @@ def _normalize_source_records(
             "Search-source normalize() must return a mapping keyed by each "
             "record's non-empty ID"
         )
-    records = [
-        normalize_source_record(record, format=format_name)
-        for record in normalized.values()
-    ]
+    records = list(normalized.values())
     for record in records:
         entrytype = record.get("ENTRYTYPE", "misc")
         if not isinstance(entrytype, str) or not entrytype.strip():
@@ -575,6 +581,34 @@ def _index_primary_records(
     return indexed
 
 
+def _validate_primary_record_values(
+    records: list[dict[str, Any]],
+    *,
+    mapping_fields: frozenset[str],
+    list_fields: frozenset[str],
+) -> None:
+    """Require strings for primary values outside declared structures."""
+    structured_fields = mapping_fields | list_fields
+    for record in records:
+        record_id = record.get("ID")
+        for field, value in record.items():
+            if field in {"ID", "ENTRYTYPE"} or field in structured_fields:
+                continue
+            if not isinstance(value, str):
+                raise RecordValidationError(
+                    f"primary record {record_id!r} field {field!r} must be a string, "
+                    f"not {type(value).__name__}"
+                )
+
+
+def _normalize_primary_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    """Copy a primary record, converting enum field values to member names."""
+    return {
+        field: value.name if isinstance(value, Enum) else value
+        for field, value in record.items()
+    }
+
+
 def loads_primary(
     text: str,
     *,
@@ -582,7 +616,14 @@ def loads_primary(
     mapping_fields: Any = (),
     list_fields: Any = (),
 ) -> dict[str, dict[str, Any]]:
-    """Load primary records from a string as an ID-indexed dictionary."""
+    """Load controlled primary records as an ID-indexed dictionary.
+
+    Primary records must have unique, non-empty string IDs, non-empty string
+    ``ENTRYTYPE`` values, and string values for ordinary fields. Declare fields
+    through
+    ``mapping_fields`` or ``list_fields`` to retain their structured values.
+    Values are validated rather than normalized.
+    """
     format_name = normalize_format(format)
     mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
     from .loaders import load_string
@@ -590,11 +631,12 @@ def loads_primary(
     records = load_string(
         text,
         format_name,
-        normalize=True,
+        normalize=False,
         mapping_fields=mappings,
         list_fields=lists,
         location="<string>",
     )
+    _validate_primary_record_values(records, mapping_fields=mappings, list_fields=lists)
     return _index_primary_records(records)
 
 
@@ -611,9 +653,11 @@ def load_primary(
     For BibTeX, ``header_only=True`` extracts ``ID``, ``ENTRYTYPE``,
     ``colrev_origin``, ``colrev_status``, ``file``, ``screening_criteria``,
     and ``colrev_masterdata_provenance`` while skipping other fields.
-    Ordinary field values are strings. Declare fields through
-    ``mapping_fields`` or ``list_fields`` to decode their BibTeX values into
-    dictionaries or lists. Undeclared values remain strings.
+    Primary records are assumed to be controlled: IDs are unique, ``ENTRYTYPE``
+    values are non-empty strings, and ordinary field values are strings. Declare
+    fields through ``mapping_fields`` or ``list_fields`` to decode their BibTeX
+    values into dictionaries or lists. Other value types raise
+    ``RecordValidationError`` rather than being converted or combined.
     """
     if not isinstance(header_only, bool):
         raise TypeError("header_only must be a bool")
@@ -631,21 +675,22 @@ def load_primary(
         records = load_string(
             string,
             format_name,
+            normalize=False,
             mapping_fields=mappings,
             list_fields=lists,
             location=source,
             header_only=True,
+        )
+        _validate_primary_record_values(
+            records, mapping_fields=mappings, list_fields=lists
         )
     else:
         if format_name in {"xls", "xlsx"}:
             records = _load_path_raw(
                 source, format_name, mappings=mappings, lists=lists
             )
-            records = _normalize_without_source(
-                records,
-                format_name=format_name,
-                mapping_fields=mappings,
-                list_fields=lists,
+            _validate_primary_record_values(
+                records, mapping_fields=mappings, list_fields=lists
             )
             return _index_primary_records(records)
         string = source.read_text(encoding="utf-8-sig")
@@ -654,10 +699,13 @@ def load_primary(
         records = load_string(
             string,
             format_name,
-            normalize=True,
+            normalize=False,
             mapping_fields=mappings,
             list_fields=lists,
             location=source,
+        )
+        _validate_primary_record_values(
+            records, mapping_fields=mappings, list_fields=lists
         )
     return _index_primary_records(records)
 
@@ -782,9 +830,11 @@ def write(
     mappings and semicolon-delimited list fields. Supplying either option for
     other formats raises
     :class:`UnsupportedFormatError`. Set ``primary=True`` to validate an
-    ID-keyed primary-record mapping, sort records by ID, and restrict output to
-    BibTeX. By default, ``field_order`` (or the CoLRev-oriented order when
-    omitted) is followed by remaining fields alphabetically. Set
+    ID-keyed primary-record mapping with unique IDs, non-empty string
+    ``ENTRYTYPE`` values, and string values outside declared mapping and list
+    fields, sort records by ID, and restrict output to BibTeX. By default,
+    ``field_order`` (or the CoLRev-oriented order when omitted) is followed by
+    remaining fields alphabetically. Set
     ``sort_fields=False`` to preserve input field order without sorting. Inputs
     are sorted by record ID by default. CSV, Markdown, Excel, and RIS output
     always uses ID order; ``sort_by_id=False`` preserves input order only for
@@ -811,11 +861,18 @@ def write(
         values = list(records.values())
         if any(not isinstance(record, dict) for record in values):
             raise RecordValidationError("each primary record must be a mapping")
-        _index_primary_records(values)
+        values = [_normalize_primary_record(record) for record in values]
     mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
+    if primary:
+        _index_primary_records(values)
+        _validate_primary_record_values(
+            values, mapping_fields=mappings, list_fields=lists
+        )
     ordered_fields = _normalize_field_order(format_name, field_order)
-    normalized = normalize_records(
-        records, format="bib" if format_name == "bib" else None
+    normalized = (
+        {record["ID"]: record for record in values}
+        if primary
+        else normalize_records(records, format="bib" if format_name == "bib" else None)
     )
     if primary and mappings:
         normalized = {
@@ -828,7 +885,7 @@ def write(
             }
             for record_id, record in normalized.items()
         }
-    if sort_by_id:
+    if sort_by_id and not primary:
         normalized = sort_records_by_id(normalized)
     if primary:
         normalized = dict(sorted(normalized.items(), key=lambda item: item[1]["ID"]))
@@ -842,15 +899,26 @@ def write(
             sort_by_id=sort_by_id,
         )
         return
-    output = write_string(
-        normalized,
-        format_name,
-        mapping_fields=mappings,
-        list_fields=lists,
-        field_order=ordered_fields,
-        sort_fields=sort_fields,
-        sort_by_id=False,
-    )
+    if primary:
+        from .writers.bibtex import write_bibtex
+
+        output = write_bibtex(
+            normalized,
+            mapping_fields=mappings,
+            list_fields=lists,
+            field_order=ordered_fields,
+            sort_fields=sort_fields,
+        )
+    else:
+        output = write_string(
+            normalized,
+            format_name,
+            mapping_fields=mappings,
+            list_fields=lists,
+            field_order=ordered_fields,
+            sort_fields=sort_fields,
+            sort_by_id=False,
+        )
     destination.write_text(output, encoding="utf-8")
 
 
@@ -868,7 +936,9 @@ def update(
     Existing entries with IDs in ``records`` are replaced; entries with other
     IDs are left untouched. Records are supplied as an ID-keyed mapping. This
     byte-scanning update assumes entry headers are on their own lines and that
-    field text does not contain ``@`` at the start of a line.
+    field text does not contain ``@`` at the start of a line. IDs must be
+    unique, ``ENTRYTYPE`` values must be non-empty strings, and values outside declared
+    mapping and list fields must be strings.
     """
     if not isinstance(records, Mapping):
         raise RecordValidationError(
@@ -876,9 +946,14 @@ def update(
         )
     if not isinstance(sort_fields, bool):
         raise TypeError("sort_fields must be a bool")
-    values = list(records.values())
-    if any(not isinstance(record, dict) for record in values):
+    input_values = list(records.values())
+    if any(not isinstance(record, dict) for record in input_values):
         raise RecordValidationError("each primary record must be a mapping")
+    normalized_records = {
+        record_id: _normalize_primary_record(record)
+        for record_id, record in records.items()
+    }
+    values = list(normalized_records.values())
     _index_primary_records(values)
     for record_id, record in records.items():
         if record_id != record["ID"]:
@@ -887,8 +962,11 @@ def update(
             )
 
     mappings, lists = _structured_fields("bib", mapping_fields, list_fields)
+    _validate_primary_record_values(values, mapping_fields=mappings, list_fields=lists)
     ordered_fields = _normalize_field_order("bib", field_order)
-    normalized = normalize_records(records, format="bib")
+    from .writers.bibtex import write_bibtex
+
+    normalized = normalized_records
     if mappings:
         normalized = {
             record_id: {
@@ -902,14 +980,12 @@ def update(
         }
     serialized = {
         record_id: (
-            write_string(
+            write_bibtex(
                 {record_id: record},
-                "bib",
                 mapping_fields=mappings,
                 list_fields=lists,
                 field_order=ordered_fields,
                 sort_fields=sort_fields,
-                sort_by_id=False,
             )
             + "\n"
         ).encode("utf-8")

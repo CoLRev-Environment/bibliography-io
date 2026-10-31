@@ -17,10 +17,11 @@ def test_load_csv_fixture() -> None:
     assert [record["title"] for record in records] == ["Paper title", "Paper title"]
     assert records[0]["journal"] == "MISQ"
     assert "journal" not in records[1]
-    assert records[0]["colrev.unknonwn_source.journal_book"] == "Nature"
-    assert records[1]["colrev.unknonwn_source.journal_book"] == "Nature"
+    assert records[0]["journal_book"] == "Nature"
+    assert records[1]["journal_book"] == "Nature"
     assert records[1]["booktitle"] == "ICIS"
-    assert "colrev.unknonwn_source.citation" in records[0]
+    assert records[0]["Citation"].startswith("Nature.")
+    assert records[0]["PMCID"] == "PMC1122334"
 
 
 def test_csv_fixture_writes_and_reloads(tmp_path: Path) -> None:
@@ -31,5 +32,5 @@ def test_csv_fixture_writes_and_reloads(tmp_path: Path) -> None:
 
     assert len(written) == len(records)
     for before, after in zip(records, written):
-        for field in ("pmid", "title", "author", "year", "doi", "pmcid"):
+        for field in ("pmid", "title", "author", "year", "doi"):
             assert before.get(field) == after.get(field)

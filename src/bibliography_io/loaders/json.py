@@ -14,7 +14,11 @@ JSON_FIELD_ALIASES = {"authors": "author"}
 def normalize_without_source(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Apply JSON field aliases before shared record validation."""
     return [
-        normalize_source_record(record, field_aliases=JSON_FIELD_ALIASES)
+        normalize_source_record(
+            record,
+            field_aliases=JSON_FIELD_ALIASES,
+            generic_normalization=True,
+        )
         for record in _records_from_un_normalized_list(records)
     ]
 

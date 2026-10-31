@@ -94,8 +94,13 @@ def normalize_source_record(
     *,
     format: str | None = None,
     field_aliases: Mapping[str, str] | None = None,
+    generic_normalization: bool = False,
 ) -> dict[str, Any]:
-    """Normalize a source record using optional aliases and combine duplicates."""
+    """Normalize fields and combine duplicates.
+
+    Generic normalization canonicalizes recognized fields while retaining the
+    original names of unrecognized fields and leaves ``journal_book`` intact.
+    """
     normalized: dict[str, Any] = {}
     raw_entrytype = record.get("ENTRYTYPE")
     for field, value in record.items():
@@ -105,18 +110,34 @@ def normalize_source_record(
         if str(field).lower() == "entrytype":
             normalized["ENTRYTYPE"] = value
             continue
-        key = normalize_field_name(
-            str(field),
-            field_aliases=field_aliases,
-            # CoLRev extension fields are namespaced regardless of the source
-            # format (e.g. CSV columns can be ``colrev.pubmed.pubmedid``).
-            preserve_dots=format == "bib" or str(field).startswith("colrev."),
-            preserve_dashes=str(field).startswith("colrev."),
-        )
+        if generic_normalization:
+            normalized_field = normalize_field_name(
+                str(field),
+                preserve_dots=format == "bib" or str(field).startswith("colrev."),
+                preserve_dashes=str(field).startswith("colrev."),
+            )
+            if field_aliases is not None and normalized_field in field_aliases:
+                key = field_aliases[normalized_field]
+            elif (
+                normalized_field in STANDARD_FIELDS
+                or str(field).lower() in STANDARD_FIELDS
+            ):
+                key = normalized_field
+            else:
+                key = str(field)
+        else:
+            key = normalize_field_name(
+                str(field),
+                field_aliases=field_aliases,
+                # CoLRev extension fields are namespaced regardless of the source
+                # format (e.g. CSV columns can be ``colrev.pubmed.pubmedid``).
+                preserve_dots=format == "bib" or str(field).startswith("colrev."),
+                preserve_dashes=str(field).startswith("colrev."),
+            )
         if key == "id" and format in _TABLE_FORMATS:
             normalized[key] = value
             continue
-        if key == "journal_book":
+        if key == "journal_book" and not generic_normalization:
             if format in _TABLE_FORMATS:
                 if record.get("journal"):
                     key = "container_title"
@@ -147,22 +168,6 @@ def normalize_source_record(
         elif previous != value:
             normalized[key] = [previous, value]
     return normalized
-
-
-def namespace_unknown_fields(
-    records: list[dict[str, Any]], *, preserve_fields: frozenset[str] = frozenset()
-) -> None:
-    """Move non-standard source fields into the unknown-source namespace."""
-    for record in records:
-        for key in list(record):
-            if (
-                key not in STANDARD_FIELDS
-                and key not in preserve_fields
-                and not str(key).startswith("colrev.")
-            ):
-                record[f"colrev.unknonwn_source.{normalize_field_name(str(key))}"] = (
-                    record.pop(key)
-                )
 
 
 def normalize_format(value: str) -> str:
@@ -258,6 +263,7 @@ def _records_from_loaded_list(
     *,
     field_aliases: Mapping[str, str] | None = None,
     format: str | None = None,
+    generic_normalization: bool = False,
 ) -> list[dict[str, Any]]:
     """Validate parsed records without altering IDs or collapsing duplicates."""
     output = []
@@ -265,7 +271,10 @@ def _records_from_loaded_list(
         if not isinstance(raw, dict):
             raise ParseError("Each record must be a mapping")
         record = normalize_source_record(
-            dict(raw), format=format, field_aliases=field_aliases
+            dict(raw),
+            format=format,
+            field_aliases=field_aliases,
+            generic_normalization=generic_normalization,
         )
         entrytype = record.get("ENTRYTYPE", "misc")
         if not isinstance(entrytype, str) or not entrytype.strip():
@@ -296,12 +305,16 @@ def normalize_loaded_records(
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
     format: str | None = None,
+    generic_normalization: bool = False,
 ) -> list[dict[str, Any]]:
     """Return normalized records with strings except declared structures."""
     output = []
     for raw in records:
         record = normalize_source_record(
-            dict(raw), format=format, field_aliases=field_aliases
+            dict(raw),
+            format=format,
+            field_aliases=field_aliases,
+            generic_normalization=generic_normalization,
         )
         normalize_loaded_record_values(
             record, mapping_fields=mapping_fields, list_fields=list_fields

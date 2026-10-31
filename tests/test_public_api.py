@@ -189,6 +189,7 @@ def test_source_plugin_load_pipeline(
                 "count": 3,
                 "authors": ["Ada", "Grace"],
                 "metadata": {"rank": 2},
+                "custom-field": "kept",
             }
             return {"provider-id": record}
 
@@ -217,6 +218,7 @@ def test_source_plugin_load_pipeline(
         "count": "3",
         "authors": "Ada; Grace",
         "metadata": "{'rank': 2}",
+        "custom-field": "kept",
     }
     assert records == [expected_source_record]
     assert all(isinstance(value, str) for value in records[0].values())
