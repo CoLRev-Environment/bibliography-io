@@ -12,9 +12,26 @@
 
 </div>
 
-`bibliography-io` provides standalone loading and writing of bibliographic
-records. Using the base bibliography-io installation does not require CoLRev or
-GROBID.
+`bibliography-io` addresses the distinct requirements of bibliographic data management throughout literature reviews: robust ingestion of heterogeneous source data and efficient, reproducible management of primary records.
+
+These stages have different priorities:
+
+- **Raw data ingestion prioritizes robustness over speed.** Input formats vary across databases and may contain malformed syntax, inconsistent fields, duplicates, or missing IDs. Parsing must tolerate errors, preserve original information, and support diagnosis and debugging.
+- **Primary data management prioritizes efficiency and reproducibility.** Normalized records follow a consistent schema with unique IDs. Frequent reading and writing require efficient dictionary-based access, partial header loading, targeted updates, and deterministic serialization that avoids meaningless Git diffs.
+
+Accordingly, `bibliography-io` distinguishes three interfaces:
+
+- **`load_raw()`** — Robust parsing that preserves source structure and information.
+- **`load()`** — Orchestrated ingestion and normalization into a common primary record representation.
+- **`load_primary()`** — Efficient I/O for consistently structured primary records.
+
+Unlike format-specific libraries with differing internal representations, `bibliography-io` provides a common record structure across input formats, enabling source-independent processing in subsequent literature review steps.
+
+The package also minimizes dependencies, requiring specialized packages (e.g., for Excel or GROBID-based extraction) only when needed, facilitating integration into diverse literature review workflows.
+
+<!--
+**Guiding principle:** Forgiving at the boundaries, strict in the core, and reproducible by design.
+-->
 
 ## Installation
 
