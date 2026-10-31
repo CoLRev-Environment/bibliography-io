@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/_static/bibliography_io_logo.png" alt="bibliography-io logo" width="400">
+<img src="https://raw.githubusercontent.com/CoLRev-Environment/bibliography-io/main/docs/_static/bibliography_io_logo.png" alt="bibliography-io logo" width="400">
 
 # bibliography-io
 
