@@ -16,13 +16,12 @@
 
 These stages have different priorities:
 
-- **Raw data ingestion prioritizes robustness over speed.** Input formats vary across databases and may contain malformed syntax, inconsistent fields, duplicates, or missing IDs. Parsing must tolerate errors, preserve original information, and support diagnosis and debugging.
+- **Ingestion and normalization adapt source data for processing.** `load()` orchestrates parsing and normalization, applying source-specific rules to transform differing source structures into a common primary record representation.
 - **Primary data management prioritizes efficiency and reproducibility.** Normalized records follow a consistent schema with unique IDs. Frequent reading and writing require efficient dictionary-based access, partial header loading, targeted updates, and deterministic serialization that avoids meaningless Git diffs.
 
-Accordingly, `bibliography-io` distinguishes three interfaces:
+Accordingly, `bibliography-io` distinguishes two interfaces:
 
-- **`load_raw()`** — Robust parsing that preserves source structure and information.
-- **`load()`** — Orchestrated ingestion and normalization into a common primary record representation.
+- **`load()`** — Orchestrated ingestion and normalization that parses source-specific structures into a common primary record representation.
 - **`load_primary()`** — Efficient I/O for consistently structured primary records.
 
 Unlike format-specific libraries with differing internal representations, `bibliography-io` provides a common record structure across input formats, enabling source-independent processing in subsequent literature review steps.
@@ -55,10 +54,11 @@ available in the base bibliography-io installation do not require either extra.
 ## Usage
 
 ```python
-from bibliography_io import load_raw, write
+from bibliography_io import load, load_primary, write
 
-records = load_raw("references.bib")
-write(records, path="references.ris")
+records = load("references.bib", source="colrev.web_of_science")
+write(records, path="primary.bib", primary=True)
+primary_records = load_primary("primary.bib")
 ```
 
 File APIs infer the format from recognized suffixes; an explicit `format` can
