@@ -18,7 +18,7 @@ def normalize_without_source(records: list[dict[str, Any]]) -> list[dict[str, An
 
 def load_markdown(
     text: str, *, location: str | Path, normalize: bool = True
-) -> list[dict[str, Any]]:
+) -> list[dict[str, Any]] | dict[str, dict[str, Any]]:
     """Load reference-list Markdown through a plugin or the optional GROBID backend."""
     points = entry_points()
     matches = (

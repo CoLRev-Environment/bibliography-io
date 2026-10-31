@@ -4,14 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from bibliography_io import (
-    get_nr_records,
-    load,
-    load_df,
-    loads,
-    loads_raw,
-    write_string,
-)
+from bibliography_io import MissingRecordIDError, get_nr_records, load, load_df
+from bibliography_io import loads, loads_raw, write_string
 from bibliography_io.loaders import load_string
 from bibliography_io.loaders.bibtex import BIBTEX_FIELD_ALIASES
 from bibliography_io.loaders.ris import RIS_FIELD_ALIASES
@@ -105,8 +99,8 @@ def test_loaders_apply_their_own_field_aliases() -> None:
     )
     ris = load_string("TY  - JOUR\nT1  - Title\nER  -", format="ris", normalize=True)
 
-    assert bibtex[0]["journal"] == "Journal"
-    assert ris[0]["title"] == "Title"
+    assert bibtex["sample"]["journal"] == "Journal"
+    assert ris["000001"]["title"] == "Title"
 
 
 def test_generic_bibtex_load_preserves_namespaced_and_unknown_field_names(
@@ -121,15 +115,15 @@ def test_generic_bibtex_load_preserves_namespaced_and_unknown_field_names(
     source = tmp_path / "records.bib"
     source.write_text(text, encoding="utf-8")
 
-    expected = [
-        {
+    expected = {
+        "example": {
             "ID": "example",
             "ENTRYTYPE": "article",
             "colrev.google_scholar.uid": "GS:123",
             "colrev.files_dir.note": "checked",
             "custom-field": "custom value",
         }
-    ]
+    }
 
     assert load(source) == expected
     assert loads(text, format="bib") == expected
@@ -149,8 +143,8 @@ def test_json_load_normalizes_multivalued_fields_by_default() -> None:
       }
     ]"""
 
-    assert load_string(text, format="json", normalize=True) == [
-        {
+    assert load_string(text, format="json", normalize=True) == {
+        "sample": {
             "ENTRYTYPE": "article",
             "ID": "sample",
             "author": "Ada and Grace",
@@ -159,7 +153,7 @@ def test_json_load_normalizes_multivalued_fields_by_default() -> None:
             "volume": "4",
             "year": "2020; 2021",
         }
-    ]
+    }
 
 
 def test_non_normalized_json_preserves_source_values() -> None:
@@ -175,23 +169,28 @@ def test_non_normalized_json_preserves_source_values() -> None:
 
 
 def test_json_authors_are_standardized_and_joined_with_and() -> None:
-    text = '[{"authors":["Ada", "Grace"]}]'
+    text = '[{"ID":"sample","authors":["Ada", "Grace"]}]'
 
-    assert load_string(text, format="json", normalize=True) == [
-        {"author": "Ada and Grace", "ENTRYTYPE": "misc"}
+    assert load_string(text, format="json", normalize=True) == {
+        "sample": {"ID": "sample", "author": "Ada and Grace", "ENTRYTYPE": "misc"}
+    }
+    assert loads_raw(text, format="json") == [
+        {"ID": "sample", "authors": ["Ada", "Grace"]}
     ]
-    assert loads_raw(text, format="json") == [{"authors": ["Ada", "Grace"]}]
 
 
 def test_internal_dispatchers_accept_format_keyword() -> None:
-    parsed = load_string('[{"ENTRYTYPE":"misc","title":"Example"}]', format="json")
-    tagged = load_string("PT  - JOUR\nTI  - Example\n", format="nbib")
+    parsed = load_string(
+        '[{"ID":"sample","ENTRYTYPE":"misc","title":"Example"}]',
+        format="json",
+    )
+    with pytest.raises(MissingRecordIDError):
+        load_string("PT  - JOUR\nTI  - Example\n", format="nbib")
     written = write_csv(
         {"example": {"ID": "example", "ENTRYTYPE": "misc", "title": "Example"}}
     )
 
-    assert parsed[0]["title"] == "Example"
-    assert tagged[0]["ENTRYTYPE"] == "article"
+    assert parsed["sample"]["title"] == "Example"
     assert written.splitlines()[0] == "ID,ENTRYTYPE,title"
 
 
@@ -212,7 +211,7 @@ def test_load_df_preserves_normalized_record_order(tmp_path: Path) -> None:
 
     records = load_df(source)
 
-    assert records.index.tolist() == [0, 1]
+    assert records.index.tolist() == ["second", "first"]
     assert records["ID"].tolist() == ["second", "first"]
     assert records["title"].tolist() == ["Second", "First"]
     assert get_nr_records(source) == 2

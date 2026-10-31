@@ -97,12 +97,12 @@ The hook receives parser-level records and returns a mapping keyed by record
 ID. Each key must be a non-empty string matching that record's ``ID`` field.
 The CoLRev ``SearchSourcePackageBaseClass`` default implementation assigns IDs
 where needed, ensures they are unique, and indexes the records. Bibliography-io
-validates the returned mapping and converts its values to the ordered list
-returned by ``load()`` or ``loads()``. Source-specific field mapping and value
-transformation belong in this hook. The hook must normalize field names; before
-return, bibliography-io converts every non-string field value to a string, so
-callers can rely on normalized string-valued fields from ``load()`` and
-``loads()`` regardless of the hook's intermediate value types.
+validates and returns this ID-indexed mapping from ``load()`` or ``loads()``.
+Source-specific field mapping and value transformation belong in this hook. The
+hook must normalize field names; before return, bibliography-io converts every
+non-string field value to a string, so callers can rely on normalized
+string-valued fields from ``load()`` and ``loads()`` regardless of the hook's
+intermediate value types.
 
 In brief, the pipeline is:
 
@@ -110,7 +110,7 @@ In brief, the pipeline is:
 2. Apply ``preprocess()`` to text input or ``preprocess_file()`` to file-based
    input.
 3. Parse raw records using the format parser.
-4. Apply source normalization and return the records as a list.
+4. Apply source normalization and return the records as an ID-indexed mapping.
 
 Without ``source``, ``load()`` skips source hooks and applies generic
 normalization. The raw ``load_raw()`` and ``loads_raw()`` APIs bypass source

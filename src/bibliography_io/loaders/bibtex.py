@@ -158,7 +158,7 @@ def load_bibtex(
     list_fields: frozenset[str] = frozenset(),
     normalize: bool = True,
     header_only: bool = False,
-) -> list[dict[str, Any]]:
+) -> list[dict[str, Any]] | dict[str, dict[str, Any]]:
     """Load BibTeX entries, optionally extracting only their headers."""
     parsed = []
     for entry in re.finditer(r"@([\w-]+)\s*[{(]\s*([^,\s]+)\s*,", text):

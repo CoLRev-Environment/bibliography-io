@@ -73,7 +73,7 @@ def test_markdown_loader_uses_registered_backend(
 
     source = tmp_path / "references.md"
     source.write_text("A citation", encoding="utf-8")
-    assert load(source) == [{"ID": "1", "ENTRYTYPE": "article", "title": "Parsed"}]
+    assert load(source) == {"1": {"ID": "1", "ENTRYTYPE": "article", "title": "Parsed"}}
     assert locations == ["<string>", source]
 
 

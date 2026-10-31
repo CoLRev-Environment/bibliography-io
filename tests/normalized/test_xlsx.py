@@ -6,23 +6,14 @@ import pytest
 
 import bibliography_io as bibio
 from bibliography_io import load
-from bibliography_io import load_raw
 
 DATA = Path(__file__).parents[1] / "data" / "xlsx"
 ORIGINAL_DUPLICATE_FIXTURE = DATA / "load.xlsx"
 
 
 def test_load_xlsx_fixture() -> None:
-    records = load(ORIGINAL_DUPLICATE_FIXTURE)
-    expected = load_raw(DATA / "load_expected.bib")
-
-    assert len(records) == len(expected) == 3
-    assert all(record["title"] == "Paper title" for record in records)
-    assert [record["ENTRYTYPE"] for record in records] == [
-        "article",
-        "inproceedings",
-        "techreport",
-    ]
+    with pytest.raises(bibio.DuplicateRecordIDError, match="Id_0001"):
+        load(ORIGINAL_DUPLICATE_FIXTURE)
 
 
 def test_xlsx_source_normalization_uses_parsed_rows(
@@ -96,7 +87,7 @@ def test_xlsx_source_normalization_uses_parsed_rows(
     )
 
     assert len(records) == 3
-    assert records[0]["title"] == "Preprocessed title"
+    assert records["1"]["title"] == "Preprocessed title"
     assert calls == [("xlsx", "2026", 3)]
     assert file_hook_calls == [
         (ORIGINAL_DUPLICATE_FIXTURE, "xlsx", "2026", processed_paths[0].parent)

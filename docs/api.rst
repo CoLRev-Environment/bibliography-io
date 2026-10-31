@@ -24,25 +24,33 @@ apply normalization or assign IDs.
 File operations infer ``format`` from the suffix unless supplied explicitly;
 string operations require it.
 
-The convenience loader applies generic normalization when ``source`` is
-omitted. If ``source`` is supplied, it selects an installed CoLRev search-source
-package by its unique endpoint identifier (for example, ``colrev.crossref``).
-``source_version`` is an optional export-version label. File suffixes are used
-to infer the format unless ``format`` is supplied; pass ``format`` when the
-suffix is ambiguous or does not match the file's actual format. Use the raw
-loading APIs for parser-level values.
+The convenience loaders apply generic normalization when ``source`` is omitted.
+If ``source`` is supplied, they select an installed CoLRev search-source package
+by its unique endpoint identifier (for example, ``colrev.crossref``).
+``source_version`` is an optional export-version label. Both normalized loaders
+return a dictionary keyed by unique, non-empty record IDs; invalid or duplicate
+IDs raise ``MissingRecordIDError`` or ``DuplicateRecordIDError``. This mapping
+supports processing imports as primary records, including merging and processing
+them, while retaining IDs for back-tracing. File suffixes are used to infer the
+format unless ``format`` is supplied; pass ``format`` when the suffix is
+ambiguous or does not match the file's actual format. Use the raw loading APIs
+for parser-level values.
 
 For the return-value contracts of the raw, normalized, and primary loaders, see
 the :ref:`record-shape` section in :doc:`usage`.
 
 .. py:function:: bibliography_io.load(path, *, source=None, source_version=None, format=None)
 
-It returns a list of record dictionaries in source order. CoLRev search-source
-packages register ``search_source`` entry points in the ``colrev`` entry-point
-group; bibliography-io selects the package whose ``endpoint`` matches
-``source``. Source-specific hook behavior and package registration are described
-in :doc:`source_extensions`. A missing package raises
+It returns an ID-indexed dictionary of record dictionaries, preserving source
+order. CoLRev search-source packages register ``search_source`` entry points in
+the ``colrev`` entry-point group; bibliography-io selects the package whose
+``endpoint`` matches ``source``. Source-specific hook behavior and package
+registration are described in :doc:`source_extensions`. A missing package raises
 ``OptionalBackendUnavailableError``.
+
+.. py:function:: bibliography_io.loads(text, *, format, source=None, source_version=None)
+
+It returns the same ID-indexed mapping contract as ``load()`` for text input.
 
 ``load_df()`` calls ``load()`` and returns its normalized records as DataFrame
 rows. Parser-level data is available through the list-returning raw APIs rather

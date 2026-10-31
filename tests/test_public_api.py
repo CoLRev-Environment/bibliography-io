@@ -1,5 +1,6 @@
 """Tests for bibliography_io's standalone public API."""
 
+import json
 import subprocess
 import sys
 from inspect import signature
@@ -57,40 +58,116 @@ def test_raw_and_generic_load_contracts(tmp_path: Path) -> None:
     source.write_text("TY  - JOUR\nTI  - A title\nAU  - Ada\nER  -", encoding="utf-8")
 
     assert bibio.load_raw(source) == [{"TY": "JOUR", "TI": "A title", "AU": "Ada"}]
-    assert bibio.load(source) == [
-        {
+    assert bibio.load(source) == {
+        "000001": {
             "ENTRYTYPE": "article",
             "ID": "000001",
             "title": "A title",
             "author": "Ada",
         }
-    ]
+    }
 
 
 def test_load_format_can_override_suffix(tmp_path: Path) -> None:
     source = tmp_path / "references.txt"
     source.write_text("TY  - JOUR\nTI  - A title\nER  -", encoding="utf-8")
 
-    assert bibio.load(source, format="ris") == [
-        {"ENTRYTYPE": "article", "ID": "000001", "title": "A title"}
-    ]
+    assert bibio.load(source, format="ris") == {
+        "000001": {"ENTRYTYPE": "article", "ID": "000001", "title": "A title"}
+    }
 
 
 def test_loads_generic_text_contract() -> None:
-    assert bibio.loads("TY  - JOUR\nTI  - A title\nAU  - Ada\nER  -", format="ris") == [
-        {
+    assert bibio.loads("TY  - JOUR\nTI  - A title\nAU  - Ada\nER  -", format="ris") == {
+        "000001": {
             "ENTRYTYPE": "article",
             "ID": "000001",
             "title": "A title",
             "author": "Ada",
         }
-    ]
+    }
+
+
+@pytest.mark.parametrize("record", [{}, {"ID": " "}])
+def test_generic_normalized_loaders_reject_missing_ids(
+    tmp_path: Path, record: dict[str, object]
+) -> None:
+    text = json.dumps([record])
+    source = tmp_path / "records.json"
+    source.write_text(text, encoding="utf-8")
+
+    with pytest.raises(bibio.MissingRecordIDError):
+        bibio.load(source)
+    with pytest.raises(bibio.MissingRecordIDError):
+        bibio.loads(text, format="json")
+
+
+def test_generic_normalized_loaders_reject_duplicate_ids(tmp_path: Path) -> None:
+    text = json.dumps([{"ID": "same"}, {"ID": "same"}])
+    source = tmp_path / "records.json"
+    source.write_text(text, encoding="utf-8")
+
+    with pytest.raises(bibio.DuplicateRecordIDError, match="same"):
+        bibio.load(source)
+    with pytest.raises(bibio.DuplicateRecordIDError, match="same"):
+        bibio.loads(text, format="json")
+
+
+@pytest.mark.parametrize(
+    ("normalized", "error"),
+    [
+        ({"missing": {"title": "Title"}}, bibio.MissingRecordIDError),
+        (
+            {"first": {"ID": "same"}, "second": {"ID": "same"}},
+            bibio.DuplicateRecordIDError,
+        ),
+    ],
+)
+def test_source_normalized_loaders_require_unique_ids(
+    monkeypatch: pytest.MonkeyPatch,
+    normalized: dict[str, dict[str, object]],
+    error: type[Exception],
+) -> None:
+    class Plugin:
+        endpoint = "colrev.provider_x"
+
+        @classmethod
+        def normalize(
+            cls,
+            records: list[dict[str, object]],
+            *,
+            format: str,
+            source_version: str | None,
+        ) -> dict[str, dict[str, object]]:
+            return normalized
+
+    class Point:
+        name = "search_source"
+
+        @staticmethod
+        def load() -> type[Plugin]:
+            return Plugin
+
+    class Points:
+        @staticmethod
+        def select(*, group: str, name: str) -> list[Point]:
+            assert group == "colrev"
+            assert name == "search_source"
+            return [Point()]
+
+    monkeypatch.setattr(bibio, "entry_points", lambda: Points())
+
+    with pytest.raises(error):
+        bibio.loads(
+            "TY  - JOUR\nTI  - Title\nER  -",
+            format="ris",
+            source="colrev.provider_x",
+        )
 
 
 def test_txt_uses_generic_normalization() -> None:
-    assert bibio.loads("%T A tagged title\n", format="txt") == [
-        {"ENTRYTYPE": "article", "title": "A tagged title"}
-    ]
+    with pytest.raises(bibio.MissingRecordIDError):
+        bibio.loads("%T A tagged title\n", format="txt")
 
 
 def test_load_normalizes_json_field_values_to_strings(tmp_path: Path) -> None:
@@ -101,7 +178,7 @@ def test_load_normalizes_json_field_values_to_strings(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    record = bibio.load(source)[0]
+    record = bibio.load(source)["7"]
 
     assert record == {
         "ENTRYTYPE": "article",
@@ -126,8 +203,8 @@ def test_load_df_forwards_format_override(tmp_path: Path) -> None:
 
     records = bibio.load_df(source, format="ris")
 
-    assert records.loc[0, "ENTRYTYPE"] == "article"
-    assert records.loc[0, "title"] == "A title"
+    assert records.loc["000001", "ENTRYTYPE"] == "article"
+    assert records.loc["000001", "title"] == "A title"
 
 
 def test_load_df_delegates_to_load_with_source_options(
@@ -142,9 +219,9 @@ def test_load_df_delegates_to_load_with_source_options(
         source: str | None,
         source_version: str | None,
         format: str | None,
-    ) -> list[dict[str, object]]:
+    ) -> dict[str, dict[str, object]]:
         calls.append((source, source_version, format))
-        return [{"ID": "one", "title": "Title"}]
+        return {"one": {"ID": "one", "title": "Title"}}
 
     monkeypatch.setattr(bibio, "load", fake_load)
 
@@ -156,7 +233,7 @@ def test_load_df_delegates_to_load_with_source_options(
     )
 
     assert calls == [("colrev.crossref", "2026", "ris")]
-    assert records.loc[0, "title"] == "Title"
+    assert records.loc["one", "title"] == "Title"
 
 
 def test_source_plugin_load_pipeline(
@@ -223,15 +300,15 @@ def test_source_plugin_load_pipeline(
         "metadata": "{'rank': 2}",
         "custom-field": "kept",
     }
-    assert records == [expected_source_record]
-    assert all(isinstance(value, str) for value in records[0].values())
+    assert records == {"provider-id": expected_source_record}
+    assert all(isinstance(value, str) for value in records["provider-id"].values())
     string_records = bibio.loads(
         "TY  - JOUR\nTI  - A title\nER  -",
         format="ris",
         source="colrev.provider_x",
         source_version="2026",
     )
-    assert string_records == [expected_source_record]
+    assert string_records == {"provider-id": expected_source_record}
     assert calls == [
         ("preprocess", "ris", "2026"),
         ("normalize", "ris", "2026"),
@@ -487,7 +564,7 @@ def test_bibtex_and_ris_round_trip(tmp_path: Path) -> None:
     ris_path = tmp_path / "roundtrip.ris"
     write(records, path=ris_path)
     ris_records = bibio.load(ris_path)
-    ris_record = next(iter(ris_records))
+    ris_record = next(iter(ris_records.values()))
     source_record = next(iter(records))
     assert ris_record["title"] == source_record["title"]
     assert ris_record["author"] == source_record["author"]

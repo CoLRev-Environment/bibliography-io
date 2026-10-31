@@ -11,17 +11,23 @@ DATA = Path(__file__).parents[1] / "data" / "csv"
 def test_load_csv_fixture() -> None:
     records = load(DATA / "load.csv")
     assert len(records) == 2
-    assert [record["ID"] for record in records] == ["000001", "000002"]
-    assert [record["ENTRYTYPE"] for record in records] == ["article", "inproceedings"]
-    assert [record["pmid"] for record in records] == ["11223344", "11223345"]
-    assert [record["title"] for record in records] == ["Paper title", "Paper title"]
-    assert records[0]["journal"] == "MISQ"
-    assert "journal" not in records[1]
-    assert records[0]["journal_book"] == "Nature"
-    assert records[1]["journal_book"] == "Nature"
-    assert records[1]["booktitle"] == "ICIS"
-    assert records[0]["Citation"].startswith("Nature.")
-    assert records[0]["PMCID"] == "PMC1122334"
+    assert list(records) == ["000001", "000002"]
+    assert [record["ENTRYTYPE"] for record in records.values()] == [
+        "article",
+        "inproceedings",
+    ]
+    assert [record["pmid"] for record in records.values()] == ["11223344", "11223345"]
+    assert [record["title"] for record in records.values()] == [
+        "Paper title",
+        "Paper title",
+    ]
+    assert records["000001"]["journal"] == "MISQ"
+    assert "journal" not in records["000002"]
+    assert records["000001"]["journal_book"] == "Nature"
+    assert records["000002"]["journal_book"] == "Nature"
+    assert records["000002"]["booktitle"] == "ICIS"
+    assert records["000001"]["Citation"].startswith("Nature.")
+    assert records["000001"]["PMCID"] == "PMC1122334"
 
 
 def test_csv_fixture_writes_and_reloads(tmp_path: Path) -> None:
@@ -31,6 +37,6 @@ def test_csv_fixture_writes_and_reloads(tmp_path: Path) -> None:
     written = load(output)
 
     assert len(written) == len(records)
-    for before, after in zip(records, written):
+    for before, after in zip(records.values(), written.values()):
         for field in ("pmid", "title", "author", "year", "doi"):
             assert before.get(field) == after.get(field)

@@ -43,7 +43,8 @@ convenience ``load()`` interface:
 
    load_raw(path, *, format=None, mapping_fields=(), list_fields=()) -> list[dict]
    loads_raw(string, *, format=..., mapping_fields=(), list_fields=()) -> list[dict]
-   load(path, *, source=None, source_version=None, format=None) -> list[dict]
+   load(path, *, source=None, source_version=None, format=None) -> dict[str, dict]
+   loads(text, *, format=..., source=None, source_version=None) -> dict[str, dict]
 
 The corresponding writing interfaces are:
 
@@ -76,6 +77,11 @@ The raw API follows these principles:
   IDs.
 - ``load()`` applies generic normalization unless a source is supplied, in
   which case source-specific preprocessing and field normalization are used.
+  Both ``load()`` and ``loads()`` return records indexed by unique, non-empty
+  string IDs and raise ``MissingRecordIDError`` or ``DuplicateRecordIDError`` if
+  normalization does not produce valid IDs. The mapping supports processing
+  imported records as primary records, including merging and processing them,
+  while retaining IDs for back-tracing records to their imports.
   ``source_version`` optionally identifies provider/export conventions. These
   identifiers are distinct from ``format``, which describes the encoding. See
   :ref:`record-shape` for the public value-type guarantees.
@@ -113,15 +119,17 @@ Bibliography-io owns the loading pipeline:
 2. For text inputs, allow the package to preprocess the text; for file-based
    inputs, allow it to return the original path or a transformed temporary file.
 3. Parse the resulting input into parser-level records.
-4. Apply source-specific normalization and return an ordered list of records.
+4. Apply source-specific normalization and return the ID-indexed record mapping.
 
-The source normalizer returns an ID-keyed mapping; bibliography-io validates it
-and adapts it to the public list return type. Without a source, bibliography-io
-applies generic normalization instead. The raw ``load_raw()`` and ``loads_raw()``
-APIs bypass source hooks and expose parser-level records. Source extensions are
-optional, so using bibliography-io without a selected source does not require
-CoLRev. See :doc:`source_extensions` for package registration, hook contracts,
-and file-preprocessing details.
+The source normalizer returns an ID-keyed mapping, which bibliography-io
+validates and returns. Without a source, bibliography-io applies generic
+normalization and indexes the validated records by ID. This mapping facilitates
+processing imported records as primary records (which may then be merged and
+processed) and back-tracing records using their IDs. The raw ``load_raw()`` and
+``loads_raw()`` APIs bypass source hooks and expose parser-level records as lists.
+Source extensions are optional, so using bibliography-io without a selected
+source does not require CoLRev. See :doc:`source_extensions` for package
+registration, hook contracts, and file-preprocessing details.
 
 Primary Data API
 ----------------

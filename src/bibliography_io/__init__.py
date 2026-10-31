@@ -135,7 +135,7 @@ def _normalize_without_source(
     format_name: str,
     mapping_fields: frozenset[str] = frozenset(),
     list_fields: frozenset[str] = frozenset(),
-) -> list[dict[str, Any]]:
+) -> dict[str, dict[str, Any]]:
     """Dispatch no-source normalization to the format-specific loader."""
     if format_name == "ris":
         from .loaders.ris import normalize_without_source as format_normalizer
@@ -181,13 +181,31 @@ def _normalize_without_source(
         format=format_name,
         generic_normalization=True,
     )
-    return normalize_loaded_records(
+    normalized_records = normalize_loaded_records(
         normalized,
         mapping_fields=mapping_fields,
         list_fields=list_fields,
         format=format_name,
         generic_normalization=True,
     )
+    # TODO: Decide whether generic normalization should generate stable artificial IDs
+    # (and resolve collisions) instead of rejecting records with invalid IDs.
+    return _index_loaded_records(normalized_records)
+
+
+def _index_loaded_records(
+    records: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Validate record IDs and return records indexed by ID."""
+    indexed: dict[str, dict[str, Any]] = {}
+    for record in records:
+        record_id = record.get("ID")
+        if not isinstance(record_id, str) or not record_id.strip():
+            raise MissingRecordIDError("Loaded records require a non-empty string ID")
+        if record_id in indexed:
+            raise DuplicateRecordIDError(f"Duplicate record ID: {record_id}")
+        indexed[record_id] = record
+    return indexed
 
 
 def _normalize_field_order(format: str, field_order: Any) -> tuple[str, ...] | None:
@@ -304,7 +322,7 @@ def _normalize_source_records(
     source: str,
     format_name: str,
     source_version: str | None,
-) -> list[dict[str, Any]]:
+) -> dict[str, dict[str, Any]]:
     """Apply and validate a search-source plugin's normalization hook."""
     normalize_hook = getattr(plugin, "normalize", None)
     if normalize_hook is None:
@@ -321,18 +339,31 @@ def _normalize_source_records(
         raise BackendExecutionError(
             f"Source plugin {source!r} failed to normalize {format_name} records"
         ) from exc
-    if not isinstance(normalized, Mapping) or any(
-        not isinstance(record_id, str)
-        or not record_id
-        or not isinstance(record, dict)
-        or record.get("ID") != record_id
-        for record_id, record in normalized.items()
-    ):
+    if not isinstance(normalized, Mapping):
         raise RecordValidationError(
             "Search-source normalize() must return a mapping keyed by each "
             "record's non-empty ID"
         )
-    records = list(normalized.values())
+    records = []
+    seen_ids: set[str] = set()
+    for record in normalized.values():
+        if not isinstance(record, dict):
+            raise RecordValidationError(
+                "Search-source normalize() returned a non-mapping record"
+            )
+        actual_id = record.get("ID")
+        if not isinstance(actual_id, str) or not actual_id.strip():
+            raise MissingRecordIDError("Loaded records require a non-empty string ID")
+        if actual_id in seen_ids:
+            raise DuplicateRecordIDError(f"Duplicate record ID: {actual_id}")
+        seen_ids.add(actual_id)
+        records.append(record)
+    for record_id, record in normalized.items():
+        if not isinstance(record_id, str) or record_id != record["ID"]:
+            raise RecordValidationError(
+                "Search-source normalize() must return a mapping keyed by each "
+                "record's ID"
+            )
     for record in records:
         entrytype = record.get("ENTRYTYPE", "misc")
         if not isinstance(entrytype, str) or not entrytype.strip():
@@ -341,7 +372,7 @@ def _normalize_source_records(
             )
         record["ENTRYTYPE"] = entrytype.lower()
         normalize_loaded_record_values(record)
-    return records
+    return dict(normalized)
 
 
 def _preprocess_source_file(
@@ -400,7 +431,7 @@ def _load_text(
     source: str | None,
     source_version: str | None,
     location: str | Path,
-) -> list[dict[str, Any]]:
+) -> dict[str, dict[str, Any]]:
     """Load text through built-in format or source-plugin normalization."""
     if not isinstance(text, str):
         raise TypeError("input must be a string")
@@ -457,8 +488,8 @@ def loads(
     format: str,
     source: str | None = None,
     source_version: str | None = None,
-) -> list[dict[str, Any]]:
-    """Load and normalize text using built-in format or source-plugin rules.
+) -> dict[str, dict[str, Any]]:
+    """Load text as an ID-indexed mapping using generic or source-plugin rules.
 
     ``format`` is required because the input has no file suffix. ``xls`` and
     ``xlsx`` are not supported because they require file-based input.
@@ -481,8 +512,8 @@ def load(
     source: str | None = None,
     source_version: str | None = None,
     format: str | None = None,
-) -> list[dict[str, Any]]:
-    """Load records with normalized field names and string values.
+) -> dict[str, dict[str, Any]]:
+    """Load normalized records as a mapping keyed by unique record ID.
 
     The format is inferred from the file suffix unless ``format`` is supplied.
     Use ``format`` when the suffix is ambiguous or does not match the file's
@@ -491,7 +522,11 @@ def load(
     preprocessing and normalization hooks. Otherwise, format-specific
     no-source normalization is applied. Both paths return string values for
     every field; repeated values are combined, and native non-string values
-    are converted to strings. Use
+    are converted to strings. Both generic and source-specific normalization
+    require every record to have a non-empty, unique ID. The ID-indexed mapping
+    supports further processing as primary records, including merging and
+    processing records while retaining the IDs needed to trace them back to
+    their imported records. Use
     :func:`loads` for text input, or :func:`load_raw` and :func:`loads_raw` for
     parser-level records.
     """
@@ -737,7 +772,7 @@ def load_df(
     """
     records = load(path, source=source, source_version=source_version, format=format)
     pd = _load_pandas()
-    return pd.DataFrame(records)
+    return pd.DataFrame.from_dict(records, orient="index")
 
 
 def load_primary_df(

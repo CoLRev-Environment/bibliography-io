@@ -117,7 +117,9 @@ def normalize_without_source(records: list[dict[str, Any]]) -> list[dict[str, An
     return records
 
 
-def load_csv(text: str, *, normalize: bool = True) -> list[dict[str, Any]]:
+def load_csv(
+    text: str, *, normalize: bool = True
+) -> list[dict[str, Any]] | dict[str, dict[str, Any]]:
     """Load CSV rows as bibliography records."""
     rows = list(csv.DictReader(StringIO(text)))
     if not normalize:

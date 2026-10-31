@@ -120,7 +120,9 @@ def normalize_without_source(records: list[dict[str, Any]]) -> list[dict[str, An
     return records
 
 
-def load_ris(text: str, *, normalize: bool = True) -> list[dict[str, Any]]:
+def load_ris(
+    text: str, *, normalize: bool = True
+) -> list[dict[str, Any]] | dict[str, dict[str, Any]]:
     """Load RIS records, optionally mapping tags to bibliography fields."""
     parsed = []
     record: dict[str, Any] = {}

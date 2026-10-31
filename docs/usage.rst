@@ -74,16 +74,20 @@ may be strings, lists for repeated fields, mappings, or other format-native
 values. Raw loading does not require or generate record IDs, and it does not
 apply source-specific normalization. Unknown fields are retained.
 
-``load()`` returns records in source order as a list of dictionaries with
-normalized field names and string values. This applies both to generic
-normalization and to results returned by source-specific normalization hooks.
-Repeated values are combined into strings (authors use `` and ``; keywords use
-``; ``; other conflicting values use ``; ``). Empty scalar values and empty
-items in repeated values are omitted. A
-source-specific hook may select and normalize fields, but its non-string field
-values are converted to strings before ``load()`` returns. Supply a ``source``
-identifier and optional ``source_version`` to use source-specific preprocessing
-and normalization:
+``load()`` and ``loads()`` return a dictionary keyed by record ID, with
+normalized field names and string values. IDs must be non-empty strings and
+unique; missing or duplicate IDs raise ``MissingRecordIDError`` or
+``DuplicateRecordIDError``. The ID-indexed mapping supports processing imported
+records as primary records, including merging and processing them, while
+retaining IDs for back-tracing records to their imports. This applies both to
+generic normalization and to results returned by source-specific normalization
+hooks. Repeated values are combined into strings (authors use `` and ``;
+keywords use ``; ``; other conflicting values use ``; ``). Empty scalar values
+and empty items in repeated values are omitted. A source-specific hook may select
+and normalize fields, but its non-string field values are converted to strings
+before ``load()`` or ``loads()`` returns. Supply a ``source`` identifier and
+optional ``source_version`` to use source-specific preprocessing and
+normalization:
 
 .. code-block:: python
 
@@ -107,7 +111,7 @@ DataFrame helpers
 -----------------
 
 ``load_df()`` returns the normalized records from ``load()`` as DataFrame rows
-in source order, with a default ``RangeIndex``. It accepts ``source``,
+in source order, with record IDs as the index. It accepts ``source``,
 ``source_version``, and ``format``. ``load_primary_df()`` returns primary
 records with IDs as the DataFrame index. Parser-level records remain available
 as lists through ``load_raw()`` and ``loads_raw()``. Pandas is optional; install
@@ -140,7 +144,7 @@ Format examples
 
 String loaders require an explicit format. Use ``loads_raw()`` to inspect
 format-specific field names and parser-level values; use ``loads()`` for
-normalized field names and values. In normalized records, authors are combined
+normalized, ID-indexed records. In normalized records, authors are combined
 into one ``author`` string joined by the word ``and``.
 
 .. code-block:: python

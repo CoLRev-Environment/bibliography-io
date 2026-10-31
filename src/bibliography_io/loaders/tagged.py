@@ -123,7 +123,7 @@ def normalize_without_source(
 
 def load_tagged(
     text: str, format: str, *, normalize: bool = True
-) -> list[dict[str, Any]]:
+) -> list[dict[str, Any]] | dict[str, dict[str, Any]]:
     """Load ENL, NBIB, or TXT records using each format's tag conventions."""
     parsed = []
     current: dict[str, Any] = {}

@@ -23,7 +23,9 @@ def normalize_without_source(records: list[dict[str, Any]]) -> list[dict[str, An
     ]
 
 
-def load_json(text: str, *, normalize: bool = True) -> list[dict[str, Any]]:
+def load_json(
+    text: str, *, normalize: bool = True
+) -> list[dict[str, Any]] | dict[str, dict[str, Any]]:
     """Load a JSON list of records."""
     records = json.loads(text)
     if normalize:

@@ -7,6 +7,8 @@ from typing import Any
 
 from ..exceptions import (
     BackendExecutionError,
+    DuplicateRecordIDError,
+    MissingRecordIDError,
     OptionalBackendUnavailableError,
     ParseError,
     UnsupportedFormatError,
@@ -22,7 +24,7 @@ def load_string(
     list_fields: frozenset[str] = frozenset(),
     location: str | Path = "<string>",
     header_only: bool = False,
-) -> list[dict[str, Any]]:
+) -> list[dict[str, Any]] | dict[str, dict[str, Any]]:
     """Load text through a format loader, using location for Markdown context."""
     try:
         if format == "bib":
@@ -67,7 +69,13 @@ def load_string(
             mapping_fields=mapping_fields,
             list_fields=list_fields,
         )
-    except (BackendExecutionError, OptionalBackendUnavailableError, ParseError):
+    except (
+        BackendExecutionError,
+        DuplicateRecordIDError,
+        MissingRecordIDError,
+        OptionalBackendUnavailableError,
+        ParseError,
+    ):
         raise
     except Exception as exc:
         raise ParseError(f"Could not load {format} input: {exc}") from exc
