@@ -1,7 +1,7 @@
 # Releasing
 
-The initial release version proposed for this project is `0.1.0`. Confirm the
-version and package name with the maintainers before publishing.
+The current release target is `0.2.0`. Keep the project version, release notes,
+and Git tag synchronized when preparing a release.
 
 ## Required pre-release checks
 
@@ -48,7 +48,7 @@ python -m venv /tmp/bibliography-io-testpypi
 /tmp/bibliography-io-testpypi/bin/python -m pip install \
     --index-url https://test.pypi.org/simple/ \
     --extra-index-url https://pypi.org/simple/ \
-    "bibliography-io==0.1.0"
+    "bibliography-io==0.2.0"
 ```
 
 Repeat the installed-wheel smoke test against the TestPyPI installation. The
@@ -66,7 +66,7 @@ when a GitHub Release is published. Before using it:
 2. Create the matching GitHub `pypi` environment and configure any required
    protection rules.
 3. Publish only after CI and TestPyPI verification pass. Use a `v<version>` tag
-   matching `project.version` (for example, `v0.1.0`).
+   matching `project.version` (for example, `v0.2.0`).
 
 ## Compatibility status
 
