@@ -31,7 +31,8 @@ and Git tag synchronized when preparing a release.
    round-trip with the installed wheel. The wheel test must not install the
    optional extras.
 3. Built-in Markdown table output is part of the default test suite. Test
-   Markdown reference-list parsing with the ``markdown`` extra and Excel
+   Markdown reference-list parsing with the ``markdown`` extra using mocked
+   GROBID responses (no running service is needed for the test suite), and Excel
    load/write with the ``excel`` extra. The installed-wheel smoke test should
    continue to run without extras.
 4. Update `project.version` in `pyproject.toml`, add release notes, and keep the
@@ -73,4 +74,5 @@ when a GitHub Release is published. Before using it:
 The standalone bibliography-io API and its format-specific data fixtures are
 covered without CoLRev or GROBID. Historical CoLRev-facing compatibility
 wrappers are outside the standalone test suite. Markdown reference-list parsing
-is optional and remains unverified until its backend is finalized and tested.
+is optional and tested with mocked ``grobid-tei`` responses; a running GROBID
+service is not required for automated tests.

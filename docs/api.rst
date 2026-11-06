@@ -6,15 +6,15 @@ The strict standalone public API is:
 File operations infer formats from filename suffixes unless an explicit
 ``format`` is provided. String operations require ``format``. See
 :doc:`usage` for the read/write format matrix, including the distinction
-between built-in Markdown table output and pending optional reference-list
-parsing.
+between built-in Markdown table output and optional reference-list parsing.
 
 Loading API
 -----------
 
 Raw loaders return an ordered list of record dictionaries with parser-level
 field names and values (for example, strings, lists, or mappings). They do not
-apply normalization or assign IDs.
+apply normalization. Markdown loading assigns sequential IDs to parsed GROBID
+references so they remain identifiable as records.
 
 .. py:function:: bibliography_io.load_raw(path, *, format=None, mapping_fields=(), list_fields=())
 

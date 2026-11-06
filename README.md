@@ -43,13 +43,15 @@ pip install bibliography-io
 Install optional features as needed:
 
 ```shell
-pip install "bibliography-io[markdown]"  # Markdown parsing through CoLRev/GROBID
+pip install "bibliography-io[markdown]"  # Markdown parsing through GROBID
 pip install "bibliography-io[excel]"     # Excel file support
 pip install "bibliography-io[all]"       # Both optional features
 ```
 
-Markdown reference-list parsing also requires a running GROBID service. Formats
-available in the base bibliography-io installation do not require either extra.
+Markdown reference-list parsing uses `grobid-tei` and requires a running GROBID
+service. It uses `http://localhost:8070` by default; set
+`BIBLIOGRAPHY_IO_GROBID_URL` to override the service URL. Formats available in
+the base bibliography-io installation do not require either extra.
 
 ## Usage
 
@@ -86,13 +88,13 @@ suffix is ambiguous or does not match the file's actual format.
 | JSON (`.json`) | Yes | *Planned* | `loads_raw()` (`to_string()` planned) |
 | CSV (`.csv`) | Yes | Yes | `loads_raw()` / `to_string()` |
 | Excel (`.xls`, `.xlsx`) | Yes | Yes | File APIs only |
-| Markdown (`.md`) | *Planned* | *Planned* | *Planned* |
+| Markdown (`.md`) | Yes (`markdown` extra) | Yes (tables) | `loads_raw()` / `to_string()` |
 
 Markdown table writing is built into bibliography-io.
-Markdown reference-list parsing is planned as a separate optional feature; its
-backend and installation extra are not finalized. Requesting Markdown
-reference-list input without a registered backend raises
-``OptionalBackendUnavailableError``.
+Markdown reference-list parsing uses GROBID through `grobid-tei` and requires a
+running GROBID service. It defaults to `http://localhost:8070`; set
+`BIBLIOGRAPHY_IO_GROBID_URL` to use another service URL. PDF handling will be
+added later; see [pdf.md](pdf.md).
 
 See the [documentation](https://colrev-environment.github.io/bibliography-io/)
 for installation details, usage examples, and the generated API reference.

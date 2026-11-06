@@ -2,6 +2,14 @@
 
 Notable changes to bibliography-io are documented here.
 
+## Unreleased
+
+### Added
+
+- Add optional Markdown reference-list parsing through `grobid-tei`.
+- Configure the GROBID service URL with `BIBLIOGRAPHY_IO_GROBID_URL`,
+  defaulting to `http://localhost:8070`.
+
 ## 0.2.0 — 2026-10-31
 
 ### Added

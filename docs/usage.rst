@@ -56,12 +56,14 @@ Markdown forms and optional dependencies
 -----------------------------------------
 
 Markdown table output is built into bibliography-io and does not need an
-optional backend. Markdown reference-list parsing uses CoLRev and GROBID and is
-enabled by installing ``bibliography-io[markdown]``. A running GROBID service is
-also required. Without the extra, a Markdown read raises
-``OptionalBackendUnavailableError``. Excel loading and writing require
-``bibliography-io[excel]``; the ``all`` extra installs both optional feature
-sets.
+optional backend. Markdown reference-list parsing uses ``grobid-tei`` and is
+enabled by installing ``bibliography-io[markdown]``. It sends the non-empty,
+non-heading lines to a running GROBID service as citations. The service URL
+defaults to ``http://localhost:8070``; set ``BIBLIOGRAPHY_IO_GROBID_URL`` to
+override it. Without the extra, a Markdown read raises
+``OptionalBackendUnavailableError``. PDF loading will be added later. Excel
+loading and writing require ``bibliography-io[excel]``; the ``all`` extra
+installs both optional feature sets.
 
 .. _record-shape:
 
@@ -71,8 +73,9 @@ Record shape
 ``load_raw()`` and ``loads_raw()`` return records in source order as a list of
 dictionaries. They preserve parser-level field names and value types: values
 may be strings, lists for repeated fields, mappings, or other format-native
-values. Raw loading does not require or generate record IDs, and it does not
-apply source-specific normalization. Unknown fields are retained.
+values. Raw loading does not require record IDs and does not apply
+source-specific normalization. Markdown GROBID results receive sequential IDs
+in returned reference order. Unknown fields are retained.
 
 ``load()`` and ``loads()`` return a dictionary keyed by record ID, with
 normalized field names and string values. IDs must be non-empty strings and

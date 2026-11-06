@@ -58,6 +58,7 @@ jobs:
           from bibliography_io.exceptions import OptionalBackendUnavailableError
 
           assert importlib.util.find_spec("colrev") is None
+          assert importlib.util.find_spec("grobid_tei") is None
           assert not entry_points().select(
               group="bibliography_io.backends", name="markdown"
           )

@@ -22,9 +22,11 @@ Optional dependencies enable Markdown parsing and Excel file support:
    python -m pip install "bibliography-io[excel]"
    python -m pip install "bibliography-io[all]"  # both
 
-Markdown parsing uses CoLRev and GROBID and requires a running GROBID service.
-Excel loading and writing require the ``excel`` extra. Markdown table writing
-is included in bibliography-io without an extra.
+Markdown parsing uses ``grobid-tei`` and requires a running GROBID service. The
+service URL defaults to ``http://localhost:8070``; set the
+``BIBLIOGRAPHY_IO_GROBID_URL`` environment variable to override it. Excel
+loading and writing require the ``excel`` extra. Markdown table writing is
+included in bibliography-io without an extra.
 
 Quick example
 -------------

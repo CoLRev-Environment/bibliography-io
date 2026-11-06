@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import logging
+import os
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any
 
 from ..exceptions import BackendExecutionError, OptionalBackendUnavailableError
 from ..normalization import _records_from_un_normalized_list
+
+_GROBID_URL_ENV_VAR = "BIBLIOGRAPHY_IO_GROBID_URL"
+_DEFAULT_GROBID_URL = "http://localhost:8070"
 
 
 def normalize_without_source(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -70,25 +74,34 @@ def load_markdown(
 
 
 def _load_with_grobid(text: str, *, location: str | Path) -> list[dict[str, Any]]:
-    import requests
-    from colrev.env.grobid_service import GrobidService
+    try:
+        from grobid_tei import GrobidClient, TEIDocument
+    except ImportError as exc:
+        raise OptionalBackendUnavailableError(
+            "Markdown reference-list parsing requires optional dependencies. "
+            "Install them with 'pip install bibliography-io[markdown]'."
+        ) from exc
 
     logger = logging.getLogger(__name__)
     logger.info("Parsing Markdown references from %s", location)
-    grobid_service = GrobidService()
-    grobid_service.check_grobid_availability()
-    references = [line.rstrip() for line in text.splitlines() if "#" not in line[:2]]
+    citations = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    if not citations:
+        return []
 
-    bibtex = ""
-    for index, reference in enumerate(references, start=1):
-        response = requests.post(
-            grobid_service.GROBID_URL + "/api/processCitation",
-            data={"consolidateCitations": "0", "citations": reference},
-            headers={"Accept": "application/x-bibtex"},
-            timeout=30,
-        )
-        bibtex += "\n" + response.text.replace("{-1,", "{" + str(index) + ",")
+    client = GrobidClient(
+        service_url=os.environ.get(_GROBID_URL_ENV_VAR, _DEFAULT_GROBID_URL)
+    )
+    tei_xml = client.process_citation_list(citations, consolidate_citations=False)
+    document = TEIDocument.from_bytes(tei_xml)
 
-    from .bibtex import load_bibtex
-
-    return load_bibtex(bibtex, normalize=False)
+    records = []
+    for index, reference in enumerate(document.references(), start=1):
+        fields = dict(reference.fields)
+        entrytype = fields.pop("entrytype", "misc")
+        record = {"ID": str(index), "ENTRYTYPE": entrytype, **fields}
+        records.append(record)
+    return records

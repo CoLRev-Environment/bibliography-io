@@ -33,7 +33,7 @@ Changelog = "https://github.com/CoLRev-Environment/bibliography-io/releases"
 Documentation = "https://colrev-environment.github.io/bibliography-io/"
 
 [project.optional-dependencies]
-markdown = ["colrev"]
+markdown = ["grobid-tei>=0.3.0"]
 excel = ["pandas>=2.2,<3", "openpyxl>=3.1.2", "xlrd>=2.0.1"]
 all = ["bibliography-io[markdown]", "bibliography-io[excel]"]
 test = ["pytest>=8.0"]
