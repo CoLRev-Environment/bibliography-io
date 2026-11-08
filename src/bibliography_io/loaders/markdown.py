@@ -69,7 +69,10 @@ def load_markdown(
         ) from exc
     except Exception as exc:
         raise BackendExecutionError(
-            "Markdown GROBID backend failed to parse references"
+            "Markdown GROBID backend failed to parse references. Check that the "
+            "GROBID service is running and reachable at "
+            f"{os.environ.get(_GROBID_URL_ENV_VAR, _DEFAULT_GROBID_URL)!r}; "
+            "bibliography-io does not start or manage the service."
         ) from exc
 
 

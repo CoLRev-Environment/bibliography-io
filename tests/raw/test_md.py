@@ -198,6 +198,39 @@ def test_markdown_loader_uses_grobid_tei(
     assert normalized["1"]["title"] == "First title"
 
 
+def test_markdown_loader_works_without_colrev_and_does_not_manage_grobid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_import = builtins.__import__
+
+    def import_without_colrev(name: str, *args: object, **kwargs: object) -> object:
+        if name == "colrev" or name.startswith("colrev."):
+            raise ModuleNotFoundError("No module named 'colrev'", name="colrev")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", import_without_colrev)
+    _disable_registered_markdown_backends(monkeypatch)
+    monkeypatch.setenv("BIBLIOGRAPHY_IO_GROBID_URL", "http://caller.example:8070")
+
+    calls: dict[str, object] = {}
+    _install_fake_grobid(
+        monkeypatch,
+        calls=calls,
+        references=[SimpleNamespace(fields={"entrytype": "misc", "title": "Parsed"})],
+    )
+
+    from bibliography_io import loads_raw
+    from bibliography_io.loaders.markdown import load_markdown
+
+    assert load_markdown("A citation", location="<string>", normalize=False) == [
+        {"ID": "1", "ENTRYTYPE": "misc", "title": "Parsed"}
+    ]
+    assert calls["service_url"] == "http://caller.example:8070"
+    assert calls["citations"] == ["A citation"]
+    assert loads_raw("Another citation", format="md")[0]["title"] == "Parsed"
+    assert calls["service_url"] == "http://caller.example:8070"
+
+
 def test_markdown_grobid_failure_is_wrapped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -212,7 +245,8 @@ def test_markdown_grobid_failure_is_wrapped(
     )
 
     with pytest.raises(
-        exceptions.BackendExecutionError, match="GROBID backend"
+        exceptions.BackendExecutionError,
+        match="GROBID service is running and reachable",
     ) as error:
         loads_raw("A citation", format="md")
 

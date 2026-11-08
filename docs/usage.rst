@@ -56,14 +56,17 @@ Markdown forms and optional dependencies
 -----------------------------------------
 
 Markdown table output is built into bibliography-io and does not need an
-optional backend. Markdown reference-list parsing uses ``grobid-tei`` and is
-enabled by installing ``bibliography-io[markdown]``. It sends the non-empty,
-non-heading lines to a running GROBID service as citations. The service URL
-defaults to ``http://localhost:8070``; set ``BIBLIOGRAPHY_IO_GROBID_URL`` to
-override it. Without the extra, a Markdown read raises
-``OptionalBackendUnavailableError``. PDF loading will be added later. Excel
-loading and writing require ``bibliography-io[excel]``; the ``all`` extra
-installs both optional feature sets.
+optional backend. Markdown reference-list parsing uses the standalone
+``grobid-tei`` client and is enabled by installing
+``bibliography-io[markdown]``. It sends the non-empty, non-heading lines to a
+GROBID service that the caller has already started. The service URL defaults to
+``http://localhost:8070``; set ``BIBLIOGRAPHY_IO_GROBID_URL`` to provide another
+URL. The loader is designed to operate independently of the workflow application
+that uses it; it does not start, stop, or otherwise manage GROBID. If the service
+is unavailable, it raises ``BackendExecutionError``. Without the extra, a
+Markdown read raises ``OptionalBackendUnavailableError``. PDF loading will be
+added later. Excel loading and writing require ``bibliography-io[excel]``; the
+``all`` extra installs both optional feature sets.
 
 .. _record-shape:
 

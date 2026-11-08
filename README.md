@@ -48,10 +48,14 @@ pip install "bibliography-io[excel]"     # Excel file support
 pip install "bibliography-io[all]"       # Both optional features
 ```
 
-Markdown reference-list parsing uses `grobid-tei` and requires a running GROBID
-service. It uses `http://localhost:8070` by default; set
-`BIBLIOGRAPHY_IO_GROBID_URL` to override the service URL. Formats available in
-the base bibliography-io installation do not require either extra.
+Markdown reference-list parsing uses the standalone `grobid-tei` client and
+requires a GROBID service started by the caller. The loader is designed to
+operate independently of the workflow application that uses it: it does not
+start, stop, or otherwise manage GROBID. The service URL defaults to
+`http://localhost:8070`; set `BIBLIOGRAPHY_IO_GROBID_URL` to provide another
+URL. If the configured service is unavailable, Markdown loading raises
+`BackendExecutionError`. Formats available in the base bibliography-io
+installation do not require the Markdown extra.
 
 ## Usage
 
@@ -91,10 +95,12 @@ suffix is ambiguous or does not match the file's actual format.
 | Markdown (`.md`) | Yes (`markdown` extra) | Yes (tables) | `loads_raw()` / `to_string()` |
 
 Markdown table writing is built into bibliography-io.
-Markdown reference-list parsing uses GROBID through `grobid-tei` and requires a
-running GROBID service. It defaults to `http://localhost:8070`; set
-`BIBLIOGRAPHY_IO_GROBID_URL` to use another service URL. PDF handling will be
-added later; see [pdf.md](pdf.md).
+Markdown reference-list parsing uses GROBID through the standalone `grobid-tei`
+client and requires a service started and managed by the caller. It defaults to
+`http://localhost:8070`; set `BIBLIOGRAPHY_IO_GROBID_URL` to use another URL.
+The loader is designed to operate independently of the workflow application
+that uses it and never manages the service. PDF handling will be added later;
+see [pdf.md](pdf.md).
 
 See the [documentation](https://colrev-environment.github.io/bibliography-io/)
 for installation details, usage examples, and the generated API reference.
