@@ -16,13 +16,19 @@ field names and values (for example, strings, lists, or mappings). They do not
 apply normalization. Markdown loading assigns sequential IDs to parsed GROBID
 references so they remain identifiable as records.
 
-.. py:function:: bibliography_io.load_raw(path, *, format=None, mapping_fields=(), list_fields=())
+.. py:function:: bibliography_io.load_raw(path, *, format=None, mapping_fields=(), list_fields=(), missing_ok=False)
 
 .. py:function:: bibliography_io.loads_raw(string, *, format, mapping_fields=(), list_fields=())
 
 ``mapping_fields`` and ``list_fields`` declare structured BibTeX fields.
 File operations infer ``format`` from the suffix unless supplied explicitly;
-string operations require it.
+string operations require it. ``load_raw()`` and ``load()`` raise
+``FileNotFoundError`` for a missing path by default. Pass ``missing_ok=True``
+to return ``[]`` from ``load_raw()`` or ``{}`` from ``load()`` instead. This
+option only applies to missing paths: errors for existing non-file paths and
+parsing errors are still raised. ``loads()`` and ``loads_raw()`` accept text
+and do not take ``missing_ok``. ``load_primary()`` retains its existing behavior
+of returning ``{}`` for a missing path.
 
 BibTeX repair API
 -----------------
@@ -50,7 +56,7 @@ for parser-level values.
 For the return-value contracts of the raw, normalized, and primary loaders, see
 the :ref:`record-shape` section in :doc:`usage`.
 
-.. py:function:: bibliography_io.load(path, *, source=None, source_version=None, format=None)
+.. py:function:: bibliography_io.load(path, *, source=None, source_version=None, format=None, missing_ok=False)
 
 It returns an ID-indexed dictionary of record dictionaries, preserving source
 order. CoLRev search-source packages register ``search_source`` entry points in

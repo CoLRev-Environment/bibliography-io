@@ -290,18 +290,25 @@ def load_raw(
     format: str | None = None,
     mapping_fields: Any = (),
     list_fields: Any = (),
+    missing_ok: bool = False,
 ) -> list[dict[str, Any]]:
     """Load parser-level records as an ordered list.
 
     The format is inferred from the suffix by default. A missing path raises
+    :class:`FileNotFoundError` unless ``missing_ok=True``, in which case an
+    empty list is returned. Existing non-file paths still raise
     :class:`FileNotFoundError`. For BibTeX, callers may
     declare structured fields with ``mapping_fields`` and ``list_fields``;
     these options are unsupported for other formats.
     """
+    if not isinstance(missing_ok, bool):
+        raise TypeError("missing_ok must be a bool")
     source = Path(path)
     format_name = _format_from_path(source, format)
     mappings, lists = _structured_fields(format_name, mapping_fields, list_fields)
     if not source.is_file():
+        if missing_ok and not source.exists():
+            return []
         raise FileNotFoundError(source)
     return _load_path_raw(source, format_name, mappings=mappings, lists=lists)
 
@@ -536,6 +543,7 @@ def load(
     source: str | None = None,
     source_version: str | None = None,
     format: str | None = None,
+    missing_ok: bool = False,
 ) -> dict[str, dict[str, Any]]:
     """Load normalized records as a mapping keyed by unique record ID.
 
@@ -552,8 +560,13 @@ def load(
     processing records while retaining the IDs needed to trace them back to
     their imported records. Use
     :func:`loads` for text input, or :func:`load_raw` and :func:`loads_raw` for
-    parser-level records.
+    parser-level records. A missing path raises :class:`FileNotFoundError`
+    unless ``missing_ok=True``, in which case an empty mapping is returned.
+    Existing non-file paths and errors while parsing existing files are not
+    suppressed.
     """
+    if not isinstance(missing_ok, bool):
+        raise TypeError("missing_ok must be a bool")
     if source is not None and (not isinstance(source, str) or not source.strip()):
         raise RecordValidationError("source must be a non-empty string when supplied")
     if source_version is not None and not isinstance(source_version, str):
@@ -561,6 +574,8 @@ def load(
     source_path = Path(path)
     format_name = _format_from_path(source_path, format)
     if not source_path.is_file():
+        if missing_ok and not source_path.exists():
+            return {}
         raise FileNotFoundError(source_path)
     if source is None:
         if format_name in {"xls", "xlsx"}:
@@ -708,6 +723,8 @@ def load_primary(
     list_fields: Any = (),
 ) -> dict[str, dict[str, Any]]:
     """Load primary records as an ID-indexed dictionary.
+
+    A missing path returns an empty dictionary.
 
     For BibTeX, ``header_only=True`` extracts ``ID``, ``ENTRYTYPE``,
     ``colrev_origin``, ``colrev_status``, ``file``, ``screening_criteria``,

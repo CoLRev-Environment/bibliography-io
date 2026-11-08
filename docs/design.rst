@@ -41,9 +41,9 @@ convenience ``load()`` interface:
 
 .. code-block:: python
 
-   load_raw(path, *, format=None, mapping_fields=(), list_fields=()) -> list[dict]
+   load_raw(path, *, format=None, mapping_fields=(), list_fields=(), missing_ok=False) -> list[dict]
    loads_raw(string, *, format=..., mapping_fields=(), list_fields=()) -> list[dict]
-   load(path, *, source=None, source_version=None, format=None) -> dict[str, dict]
+   load(path, *, source=None, source_version=None, format=None, missing_ok=False) -> dict[str, dict]
    loads(text, *, format=..., source=None, source_version=None) -> dict[str, dict]
 
 The corresponding writing interfaces are:
@@ -63,7 +63,9 @@ The raw API follows these principles:
 - File APIs infer the format from a recognized suffix when ``format`` is omitted.
   Supply ``format`` when the suffix is ambiguous or does not match the file's
   actual format. String APIs require an explicit format. An unknown or
-  unsupported format raises ``UnsupportedFormatError``.
+  unsupported format raises ``UnsupportedFormatError``. Path-based ``load()``
+  and ``load_raw()`` raise ``FileNotFoundError`` for missing files unless
+  ``missing_ok=True``; they then return the corresponding empty result.
 - Raw loading does not require record IDs to be present or unique. Raw parsing
   does not generate IDs. Accordingly, loading returns a list rather than an
   ID-indexed dictionary, preserving source order and every record. This may

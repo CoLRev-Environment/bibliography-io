@@ -2,6 +2,16 @@
 
 Notable changes to bibliography-io are documented here.
 
+## 0.4.0 — 2026-11-08
+
+### Added
+
+- Add an opt-in `missing_ok` option to `load_raw()` and `load()` for
+  treating missing paths as empty results while preserving strict behavior by
+  default.
+- Document missing-path behavior across the raw, normalized, and primary
+  loading APIs.
+
 ## 0.3.0 — 2026-11-08
 
 ### Added

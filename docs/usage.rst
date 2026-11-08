@@ -6,7 +6,14 @@ File and string APIs
 
 File APIs accept a path as ``str`` or ``pathlib.Path``. They infer the format
 from a recognized suffix, unless ``format`` is supplied explicitly. Reads use
-UTF-8 and missing files raise ``FileNotFoundError``.
+UTF-8 and missing files raise ``FileNotFoundError`` for ``load_raw()`` and
+``load()`` by default. Pass ``missing_ok=True`` to either path-based loader to
+return its empty value (``[]`` or ``{}``) when the path is missing. This does
+not suppress errors for existing non-file paths or malformed files. The
+``load_primary()`` API continues to return ``{}`` for a missing path.
+This is convenient for searches where results may not exist as a file yet:
+callers can handle the empty list or dictionary directly instead of catching
+``FileNotFoundError``.
 
 .. code-block:: python
 
