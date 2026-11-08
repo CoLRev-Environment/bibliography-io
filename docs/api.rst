@@ -24,6 +24,17 @@ references so they remain identifiable as records.
 File operations infer ``format`` from the suffix unless supplied explicitly;
 string operations require it.
 
+BibTeX repair API
+-----------------
+
+.. autofunction:: bibliography_io.fix_bib_file
+
+The repair operates on the supplied file in place and does not create a backup.
+It replaces semicolons and whitespace in citation keys with underscores,
+appends alphabetic suffixes to duplicate citation keys, and replaces whitespace
+in field names with underscores. The optional ``logger`` argument defaults to
+the ``bibliography_io`` package logger.
+
 The convenience loaders apply generic normalization when ``source`` is omitted.
 If ``source`` is supplied, they select an installed CoLRev search-source package
 by its unique endpoint identifier (for example, ``colrev.crossref``).

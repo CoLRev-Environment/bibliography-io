@@ -1,15 +1,16 @@
 """Tests for bibliography_io's standalone public API."""
 
 import json
+import logging
 import subprocess
 import sys
-from inspect import signature
+from inspect import Parameter, signature
 from pathlib import Path
 
 import pytest
 
 import bibliography_io as bibio
-from bibliography_io import load_raw, write
+from bibliography_io import fix_bib_file, load_raw, write
 
 
 def test_strict_public_api_is_exposed() -> None:
@@ -23,6 +24,10 @@ def test_strict_public_api_is_exposed() -> None:
     assert callable(bibio.load_df)
     assert callable(bibio.load_primary_df)
     assert callable(bibio.get_nr_records)
+    assert callable(fix_bib_file)
+    assert "fix_bib_file" in bibio.__all__
+    assert signature(fix_bib_file).parameters["logger"].kind is Parameter.KEYWORD_ONLY
+    assert signature(fix_bib_file).parameters["logger"].default is None
     assert "normalize" not in signature(bibio.load_raw).parameters
     assert "normalize" not in signature(bibio.loads_raw).parameters
     assert "normalize" not in signature(bibio.load).parameters
@@ -458,6 +463,44 @@ def test_file_api_round_trip(tmp_path: Path) -> None:
     source = tmp_path / "input.bib"
     write(records, path=source)
     assert load_raw(source) == list(records.values())
+
+
+@pytest.mark.parametrize("as_string", [False, True])
+def test_public_fix_bib_file_repairs_file_and_uses_default_logger(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, as_string: bool
+) -> None:
+    caplog.set_level(logging.INFO, logger="bibliography_io")
+    path = tmp_path / "malformed.bib"
+    path.write_text(
+        """\
+@article{first;key,
+  author name = {Example, Alex},
+}
+@article{second key,
+  title={Another entry},
+}
+@article{same,
+  title={First duplicate},
+}
+@article{same,
+  title={Second duplicate},
+}
+""",
+        encoding="utf-8",
+    )
+
+    filename = str(path) if as_string else path
+    assert fix_bib_file(filename) is None
+
+    repaired = path.read_text(encoding="utf-8")
+    assert "@article{first_key," in repaired
+    assert "author_name = {Example, Alex}," in repaired
+    assert "@article{second_key," in repaired
+    assert "@article{same," in repaired
+    assert "@article{samea," in repaired
+    assert "Fix invalid key" in caplog.text
+    assert "Fix duplicate ID: same >> samea" in caplog.text
+    assert any(record.name == "bibliography_io" for record in caplog.records)
 
 
 def test_serializers_sort_list_records_by_id_by_default(tmp_path: Path) -> None:

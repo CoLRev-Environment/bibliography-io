@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable, Mapping
 from enum import Enum
 from importlib.metadata import entry_points
@@ -23,6 +24,29 @@ from .normalization import normalize_format
 from .normalization import normalize_loaded_record_values
 from .normalization import normalize_records
 from .normalization import sort_records_by_id
+
+
+def fix_bib_file(filename: str | Path, *, logger: logging.Logger | None = None) -> None:
+    """Repair malformed BibTeX entries by modifying the file in place.
+
+    The file is updated directly without creating a backup. Repairs replace
+    semicolons and whitespace in citation keys with underscores, append
+    alphabetic suffixes to duplicate citation keys, and replace whitespace in
+    field names with underscores.
+
+    Args:
+        filename: String or :class:`pathlib.Path` filename of the BibTeX file.
+        logger: Optional logger used to report corrections. Defaults to the
+            ``bibliography_io`` package logger.
+
+    Returns:
+        None
+    """
+    from .loaders.bibtex import run_fix_bib_file
+
+    if logger is None:
+        logger = logging.getLogger(__name__)
+    run_fix_bib_file(Path(filename), logger=logger)
 
 
 def write_string(
@@ -1079,6 +1103,7 @@ __all__ = [
     "RecordValidationError",
     "SerializationError",
     "UnsupportedFormatError",
+    "fix_bib_file",
     "get_nr_records",
     "load",
     "load_df",
