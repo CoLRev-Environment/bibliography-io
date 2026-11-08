@@ -99,8 +99,7 @@ Markdown reference-list parsing uses GROBID through the standalone `grobid-tei`
 client and requires a service started and managed by the caller. It defaults to
 `http://localhost:8070`; set `BIBLIOGRAPHY_IO_GROBID_URL` to use another URL.
 The loader is designed to operate independently of the workflow application
-that uses it and never manages the service. PDF handling will be added later;
-see [pdf.md](pdf.md).
+that uses it and never manages the service. PDF handling will be added later.
 
 See the [documentation](https://colrev-environment.github.io/bibliography-io/)
 for installation details, usage examples, and the generated API reference.

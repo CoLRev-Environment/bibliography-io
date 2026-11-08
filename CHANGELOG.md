@@ -2,13 +2,14 @@
 
 Notable changes to bibliography-io are documented here.
 
-## Unreleased
+## 0.3.0 — 2026-11-08
 
 ### Added
 
 - Add optional Markdown reference-list parsing through `grobid-tei`.
 - Configure the GROBID service URL with `BIBLIOGRAPHY_IO_GROBID_URL`,
   defaulting to `http://localhost:8070`.
+- Expose `fix_bib_file()` in the public API to repair malformed BibTeX files.
 
 ## 0.2.0 — 2026-10-31
 
