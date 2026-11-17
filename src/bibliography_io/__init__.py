@@ -178,10 +178,20 @@ def _normalize_without_source(
 
         records = format_normalizer(records)
 
-    elif format_name in {"enl", "nbib", "txt"}:
-        from .loaders.tagged import normalize_without_source as format_normalizer
+    elif format_name == "enl":
+        from .loaders.enl import normalize_without_source as format_normalizer
 
-        records = format_normalizer(records, format=format_name)
+        records = format_normalizer(records)
+
+    elif format_name == "nbib":
+        from .loaders.nbib import normalize_without_source as format_normalizer
+
+        records = format_normalizer(records)
+
+    elif format_name == "txt":
+        from .loaders.txt import normalize_without_source as format_normalizer
+
+        records = format_normalizer(records)
 
     elif format_name == "json":
         from .loaders.json import normalize_without_source as format_normalizer

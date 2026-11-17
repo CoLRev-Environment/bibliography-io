@@ -39,10 +39,18 @@ def load_string(
             from .ris import load_ris
 
             result = load_ris(string, normalize=False)
-        elif format in {"enl", "nbib", "txt"}:
-            from .tagged import load_tagged
+        elif format == "enl":
+            from .enl import load_enl
 
-            result = load_tagged(string, format=format, normalize=False)
+            result = load_enl(string, normalize=False)
+        elif format == "nbib":
+            from .nbib import load_nbib
+
+            result = load_nbib(string, normalize=False)
+        elif format == "txt":
+            from .txt import load_txt
+
+            result = load_txt(string, normalize=False)
         elif format == "csv":
             from .tabular import load_csv
 
