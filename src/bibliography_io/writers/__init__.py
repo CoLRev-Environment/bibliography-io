@@ -9,7 +9,7 @@ from ..normalization import normalize_format
 from ..normalization import normalize_records
 from ..normalization import sort_records_by_id
 
-WRITE_FORMATS = {"bib", "ris", "csv", "xlsx", "md"}
+WRITE_FORMATS = {"bib", "ris", "enl", "csv", "xlsx", "md"}
 
 
 def write_string(
@@ -47,6 +47,10 @@ def write_string(
         from .ris import write_ris
 
         return write_ris(data)
+    if format_name == "enl":
+        from .enl import write_enl
+
+        return write_enl(data)
     if format_name == "csv":
         from .csv import write_csv
 

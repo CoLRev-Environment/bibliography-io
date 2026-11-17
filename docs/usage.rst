@@ -42,10 +42,11 @@ Excel (``.xls`` and ``.xlsx``), ENL/EndNote (``.enl`` and ``.txt``), NBIB
 (``.nbib``), and JSON (``.json``). It also accepts Markdown (``.md``) for
 reference-list parsing only when the optional backend is installed.
 
-``write`` writes BibTeX, RIS, CSV, Excel (``.xlsx``), and Markdown
-tables. JSON, ENL, NBIB, and legacy Excel (``.xls``) are read-only. ``to_string``
-supports BibTeX, RIS, CSV, and Markdown-table output. Excel is a file-only
-format; ``loads_raw`` supports the string-based input formats.
+``write`` writes BibTeX, RIS, ENL/EndNote (``.enl``), CSV, Excel (``.xlsx``),
+and Markdown tables. JSON, NBIB, and legacy Excel (``.xls``) are read-only.
+``to_string`` supports BibTeX, RIS, ENL/EndNote, CSV, and Markdown-table output.
+Unknown ENL fields are skipped with a warning. Excel is a file-only format;
+``loads_raw`` supports the string-based input formats.
 
 Use ``write(..., primary=True)`` to write a primary-record mapping. This mode
 validates that records have unique, non-empty IDs and valid entry types, and

@@ -87,7 +87,7 @@ suffix is ambiguous or does not match the file's actual format.
 | --- | --- | --- | --- |
 | BibTeX (`.bib`) | Yes | Yes | `loads_raw()` / `to_string()` |
 | RIS (`.ris`) | Yes | Yes | `loads_raw()` / `to_string()` |
-| ENL / EndNote (`.enl`) | Yes | *Planned* | `loads_raw()` (`to_string()` planned) |
+| ENL / EndNote (`.enl`) | Yes | Yes | `loads_raw()` / `to_string()` |
 | NBIB (`.nbib`) | Yes | *Planned* | `loads_raw()` (`to_string()` planned) |
 | JSON (`.json`) | Yes | *Planned* | `loads_raw()` (`to_string()` planned) |
 | CSV (`.csv`) | Yes | Yes | `loads_raw()` / `to_string()` |

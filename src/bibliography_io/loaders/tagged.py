@@ -41,14 +41,30 @@ _TXT_FIELD_MAP = {
 _ENL_FIELD_MAP = {
     "T": "title",
     "A": "author",
+    "C": "address",
     "D": "year",
     "B": "journal",
+    "E": "editor",
+    "I": "publisher",
+    "K": "keywords",
     "V": "volume",
     "N": "number",
     "P": "pages",
+    "R": "doi",
     "X": "abstract",
     "U": "url",
     "8": "date",
+}
+_ENL_ENTRYTYPE_MAP = {
+    "Journal Article": "article",
+    "Book": "book",
+    "Book Section": "incollection",
+    "Inproceedings": "inproceedings",
+    "Thesis": "phdthesis",
+    "Conference Proceedings": "proceedings",
+    "Report": "techreport",
+    "Manuscript": "unpublished",
+    "Generic": "misc",
 }
 
 
@@ -90,10 +106,7 @@ def normalize_without_source(
         for index, record in enumerate(records, start=1):
             raw_type = record.pop("0", None)
             if raw_type is not None:
-                record["ENTRYTYPE"] = {
-                    "Journal Article": "article",
-                    "Inproceedings": "inproceedings",
-                }.get(raw_type, "misc")
+                record["ENTRYTYPE"] = _ENL_ENTRYTYPE_MAP.get(raw_type, "misc")
             else:
                 record["ENTRYTYPE"] = (
                     "article" if "V" in record or "N" in record else "inproceedings"
