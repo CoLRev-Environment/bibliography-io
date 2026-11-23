@@ -8,8 +8,7 @@ from bibliography_io.loaders.txt import normalize_without_source
 
 def test_txt_parser_preserves_tags_and_repeated_values() -> None:
     text = (
-        "%0 Journal Article\n%T A title\n%A Ada\n%A Grace\n%8 2024\n\n"
-        "%T Another title"
+        "%0 Journal Article\n%T A title\n%A Ada\n%A Grace\n%8 2024\n\n%T Another title"
     )
 
     assert loads_raw(text, format="txt") == [

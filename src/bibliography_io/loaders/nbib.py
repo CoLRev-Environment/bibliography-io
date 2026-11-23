@@ -88,9 +88,7 @@ def load_nbib(
         elif tag in current:
             previous = current[tag]
             current[tag] = (
-                [*previous, value]
-                if isinstance(previous, list)
-                else [previous, value]
+                [*previous, value] if isinstance(previous, list) else [previous, value]
             )
         else:
             current[tag] = value
