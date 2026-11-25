@@ -5,12 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from bibliography_io import load_raw
-from bibliography_io import loads_raw
-from bibliography_io import to_string
-from bibliography_io import update
-from bibliography_io import write
-from bibliography_io import write_string
+from bibliography_io import load_raw, loads, loads_raw, to_string
+from bibliography_io import update, write, write_string
 from bibliography_io.exceptions import ParseError
 from bibliography_io.exceptions import RecordValidationError
 from bibliography_io.exceptions import SerializationError
@@ -543,6 +539,39 @@ def test_bibtex_dotted_field_names_are_preserved_when_writing(tmp_path: Path) ->
 
     assert "colrev.vendor.identifier" in text
     assert load_raw(output)[0]["colrev.vendor.identifier"] == "abc123"
+
+
+def test_bibtex_plus_and_colon_field_names_round_trip() -> None:
+    text = """\
+@article{example,
+  author+an:orcid={0000-0000-0000-0000},
+  legacy++field::part={custom value},
+}"""
+    expected_fields = {
+        "author+an:orcid": "0000-0000-0000-0000",
+        "legacy++field::part": "custom value",
+    }
+
+    raw = loads_raw(text, format="bib")
+    normalized = loads(text, format="bib")
+    written = to_string(
+        raw,
+        format="bib",
+        field_order=["legacy++field::part", "author+an:orcid"],
+    )
+
+    assert {field: raw[0][field] for field in expected_fields} == expected_fields
+    assert {
+        field: normalized["example"][field] for field in expected_fields
+    } == expected_fields
+    assert "author+an:orcid" in written
+    assert "legacy++field::part" in written
+    assert [
+        line.split(" = ", 1)[0].strip()
+        for line in written.splitlines()
+        if " = " in line
+    ] == ["legacy++field::part", "author+an:orcid"]
+    assert loads_raw(written, format="bib")[0] == raw[0]
 
 
 def test_unknown_suffix_raises_unsupported_format(tmp_path: Path) -> None:

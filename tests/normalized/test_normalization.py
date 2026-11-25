@@ -31,6 +31,10 @@ def test_field_aliases_are_source_specific_and_opt_in() -> None:
         )
         == "colrev.web_of_science.unique-id"
     )
+    assert (
+        normalize_field_name("author+an:orcid", preserve_plus_colon=True)
+        == "author+an:orcid"
+    )
     assert normalize_field_name("article-number") == "article_number"
     assert normalize_field_name("T1", field_aliases=RIS_FIELD_ALIASES) == "title"
     assert normalize_source_record({"journaltitle": "Journal"}) == {
@@ -45,6 +49,9 @@ def test_field_aliases_are_source_specific_and_opt_in() -> None:
     assert normalize_source_record(
         {"colrev.pubmed.pubmedid": "12345"}, format="csv"
     ) == {"colrev.pubmed.pubmedid": "12345"}
+    assert normalize_source_record(
+        {"author+an:orcid": "0000-0000-0000-0000"}, format="bib"
+    ) == {"author+an:orcid": "0000-0000-0000-0000"}
 
 
 def test_normalize_records_accepts_explicit_field_aliases() -> None:

@@ -256,7 +256,10 @@ def _normalize_field_order(format: str, field_order: Any) -> tuple[str, ...] | N
             "field_order must contain non-empty string field names"
         )
     normalized = tuple(
-        normalize_field_name(field, preserve_dots=True) for field in fields
+        normalize_field_name(
+            field, preserve_dots=True, preserve_plus_colon=format == "bib"
+        )
+        for field in fields
     )
     if len(set(normalized)) != len(normalized):
         raise RecordValidationError("field_order must not contain duplicate fields")

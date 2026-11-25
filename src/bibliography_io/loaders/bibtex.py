@@ -60,7 +60,7 @@ def _parse_fields(
     body: str, *, field_filter: frozenset[str] | None = None
 ) -> list[tuple[str, str]]:
     """Parse field assignments while allowing arbitrarily nested braces."""
-    assignments = re.compile(r"([\w.-]+)\s*=\s*")
+    assignments = re.compile(r"([\w.+:-]+)\s*=\s*")
     parsed_fields = []
     position = 0
     while match := assignments.search(body, position):

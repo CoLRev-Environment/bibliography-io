@@ -250,6 +250,26 @@ def test_primary_writer_and_update_keep_custom_field_names(tmp_path: Path) -> No
     assert bibio.load_primary(output) == records
 
 
+def test_primary_round_trip_preserves_plus_and_colon_field_names(
+    tmp_path: Path,
+) -> None:
+    records = {
+        "example": {
+            "ID": "example",
+            "ENTRYTYPE": "article",
+            "author+an:orcid": "0000-0000-0000-0000",
+            "legacy++field::part": "custom value",
+        }
+    }
+    output = tmp_path / "annotated-fields.bib"
+
+    write(records, path=output, primary=True)
+    assert bibio.load_primary(output) == records
+
+    update(output, records)
+    assert bibio.load_primary(output) == records
+
+
 def test_primary_writer_sorts_ids_by_default(tmp_path: Path) -> None:
     records = {
         "z-last": {"ID": "z-last", "ENTRYTYPE": "article", "title": "Last"},

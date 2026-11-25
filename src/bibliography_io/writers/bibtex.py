@@ -166,6 +166,7 @@ def write_bibtex(
                 field,
                 preserve_dots=True,
                 preserve_dashes=field.startswith("colrev."),
+                preserve_plus_colon=True,
             )
             for field in _DEFAULT_FIELD_ORDER
         )
@@ -184,6 +185,7 @@ def write_bibtex(
                             item[0],
                             preserve_dots=True,
                             preserve_dashes=item[0].startswith("colrev."),
+                            preserve_plus_colon=True,
                         ),
                         len(field_positions),
                     ),
@@ -191,6 +193,7 @@ def write_bibtex(
                         item[0],
                         preserve_dots=True,
                         preserve_dashes=item[0].startswith("colrev."),
+                        preserve_plus_colon=True,
                     ),
                 ),
             )
